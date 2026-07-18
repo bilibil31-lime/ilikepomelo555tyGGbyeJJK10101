@@ -1,2 +1,2 @@
 KEY:JJK10101
-LINK:https'dlfdf
+selece: linkvertisk (link:djgidjg)/ io.oi (link:lefkokef)

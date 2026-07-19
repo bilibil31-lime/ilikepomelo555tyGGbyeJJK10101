@@ -3,9 +3,11 @@ local UserInputService = game:GetService("UserInputService")
 local CoreGui = game:GetService("CoreGui")
 local Camera = workspace.CurrentCamera
 
-local LINK_PC = "https://raw.githubusercontent.com/bilibil31-lime/ilikepomelo555tyGGbyeJJK10101/main/Modules/mod_pc.lua"  
-local LINK_PE = "https://raw.githubusercontent.com/bilibil31-lime/ilikepomelo555tyGGbyeJJK10101/main/Modules/mod_pe.lua"  
+local LINK_PC = "https://raw.githubusercontent.com/bilibil31-lime/ilikepomelo555tyGGbyeJJK10101/main/Modules/mod_pc.lua"
+local LINK_PE = "https://raw.githubusercontent.com/bilibil31-lime/ilikepomelo555tyGGbyeJJK10101/main/Modules/mod_pe.lua"
 local LINK_TABS_DATA = "https://raw.githubusercontent.com/bilibil31-lime/ilikepomelo555tyGGbyeJJK10101/main/Core/pomelo_main.lua"
+local LINK_KEY = "https://raw.githubusercontent.com/bilibil31-lime/ilikepomelo555tyGGbyeJJK10101/main/Core/pomelo_key.lua"
+local LINK_MOD_CREDIT = "https://raw.githubusercontent.com/bilibil31-lime/ilikepomelo555tyGGbyeJJK10101/main/Modules/mod_credit.lua"
 
 local UI_PARENT = (gethui and gethui()) or CoreGui
 if UI_PARENT:FindFirstChild("PomeloMainUI") then UI_PARENT.PomeloMainUI:Destroy() end
@@ -13,8 +15,7 @@ if UI_PARENT:FindFirstChild("PomeloMainUI") then UI_PARENT.PomeloMainUI:Destroy(
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "PomeloMainUI"
 ScreenGui.ResetOnSpawn = false
--- [แก้บัคที่นี่]: เพิ่ม IgnoreGuiInset เพื่อให้ UI ทะลุขอบเมนู Roblox ขึ้นไปเต็มจอ 100% จริงๆ
-ScreenGui.IgnoreGuiInset = true 
+ScreenGui.IgnoreGuiInset = true
 ScreenGui.Parent = UI_PARENT
 
 local ClickSound = Instance.new("Sound")
@@ -37,7 +38,7 @@ local function ApplyGradientGlow(parent, thickness, colorSeq)
     Stroke.Color = Color3.fromRGB(255, 255, 255)
     Stroke.Thickness = thickness
     Stroke.Transparency = 0.2
-    Stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border 
+    Stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     local Gradient = Instance.new("UIGradient")
     Gradient.Parent = Stroke
     Gradient.Color = colorSeq or ColorSequence.new({
@@ -57,7 +58,7 @@ FloatingBtn.Parent = ScreenGui
 FloatingBtn.Size = UDim2.new(0, 0, 0, 0)
 FloatingBtn.Position = UDim2.new(0.5, -25, 0.1, 0)
 FloatingBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
-FloatingBtn.BackgroundTransparency = 0.2 
+FloatingBtn.BackgroundTransparency = 0.2
 FloatingBtn.AutoButtonColor = false
 FloatingBtn.Visible = false
 FloatingBtn.ZIndex = 50
@@ -75,7 +76,7 @@ Instance.new("UICorner", FloatingBtn).CornerRadius = UDim.new(0, 12)
 ApplyGradientGlow(FloatingBtn, 2)
 
 local floatDragging, floatDragStart, floatStartPos
-local floatHasMoved = false 
+local floatHasMoved = false
 
 FloatingBtn.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -89,10 +90,8 @@ end)
 UserInputService.InputChanged:Connect(function(input)
     if floatDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
         local delta = input.Position - floatDragStart
-        if delta.Magnitude > 3 then 
-            floatHasMoved = true
-        end
-        local viewport = Camera.ViewportSize
+        if delta.Magnitude > 3 then floatHasMoved = true end
+        local viewport = ScreenGui.AbsoluteSize
         local floatSize = FloatingBtn.AbsoluteSize
         local newX = math.clamp(floatStartPos.X.Offset + delta.X, 0, viewport.X - floatSize.X)
         local newY = math.clamp(floatStartPos.Y.Offset + delta.Y, 0, viewport.Y - floatSize.Y)
@@ -101,8 +100,8 @@ UserInputService.InputChanged:Connect(function(input)
 end)
 
 UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
-        floatDragging = false 
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        floatDragging = false
     end
 end)
 
@@ -110,16 +109,16 @@ end)
 -- Main Window Setup
 -- ==========================================
 local NormalSize = UDim2.new(0, 600, 0, 360)
-local MaximizeSize = UDim2.new(1, 0, 1, 0) 
+local MaximizeSize = UDim2.new(1, 0, 1, 0)
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
 MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-MainFrame.Size = NormalSize 
+MainFrame.Size = NormalSize
 MainFrame.BackgroundColor3 = Color3.fromRGB(32, 32, 38)
-MainFrame.BackgroundTransparency = 0.15 
+MainFrame.BackgroundTransparency = 0.15
 MainFrame.BorderSizePixel = 0
 MainFrame.ClipsDescendants = true
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
@@ -127,18 +126,18 @@ ApplyGradientGlow(MainFrame, 2)
 
 local MainScale = Instance.new("UIScale")
 MainScale.Parent = MainFrame
-MainScale.Scale = 0 
+MainScale.Scale = 0
 
 local BGImage = Instance.new("ImageLabel")
 BGImage.Parent = MainFrame
 BGImage.AnchorPoint = Vector2.new(0.5, 0.5)
 BGImage.Position = UDim2.new(0.5, 0, 0.5, 0)
-BGImage.Size = UDim2.new(0.7, 0, 0.9, 0) 
+BGImage.Size = UDim2.new(0.7, 0, 0.9, 0)
 BGImage.BackgroundTransparency = 1
 BGImage.Image = "rbxassetid://7965269395"
-BGImage.ImageTransparency = 0.85 
-BGImage.ScaleType = Enum.ScaleType.Fit 
-BGImage.ZIndex = 0 
+BGImage.ImageTransparency = 0.85
+BGImage.ScaleType = Enum.ScaleType.Fit
+BGImage.ZIndex = 0
 
 MainFrame.InputChanged:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseMovement and MainFrame.AbsoluteSize.X > 0 then
@@ -214,6 +213,79 @@ end
 CreateActionBtn("PC", 170, function() loadstring(game:HttpGet(LINK_PC))() end)
 CreateActionBtn("PE", 225, function() loadstring(game:HttpGet(LINK_PE))() end)
 
+-- ==========================================
+-- CREDIT SYSTEM (Buy/Rent Validation)
+-- ==========================================
+local CreditInput = Instance.new("TextBox")
+CreditInput.Parent = MainFrame
+CreditInput.Size = UDim2.new(0, 110, 0, 24)
+CreditInput.Position = UDim2.new(0, 280, 0, 10)
+CreditInput.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
+CreditInput.BackgroundTransparency = 0.2
+CreditInput.Text = "Enter Code..."
+CreditInput.TextColor3 = Color3.fromRGB(200, 200, 200)
+CreditInput.Font = Enum.Font.Jura
+CreditInput.TextSize = 12
+CreditInput.ClearTextOnFocus = true
+CreditInput.ZIndex = 11
+Instance.new("UICorner", CreditInput).CornerRadius = UDim.new(0, 6)
+ApplyGradientGlow(CreditInput, 1)
+
+local RedeemBtn = Instance.new("TextButton")
+RedeemBtn.Parent = MainFrame
+RedeemBtn.Size = UDim2.new(0, 60, 0, 24)
+RedeemBtn.Position = UDim2.new(0, 400, 0, 10)
+RedeemBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 52)
+RedeemBtn.BackgroundTransparency = 0.2
+RedeemBtn.Text = "REDEEM"
+RedeemBtn.TextColor3 = Color3.fromRGB(50, 255, 100)
+RedeemBtn.Font = Enum.Font.Jura
+RedeemBtn.TextSize = 12
+RedeemBtn.ZIndex = 11
+Instance.new("UICorner", RedeemBtn).CornerRadius = UDim.new(0, 6)
+ApplyGradientGlow(RedeemBtn, 1)
+
+RedeemBtn.MouseEnter:Connect(function() TweenService:Create(RedeemBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(60, 60, 70)}):Play() end)
+RedeemBtn.MouseLeave:Connect(function() TweenService:Create(RedeemBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(45, 45, 52)}):Play() end)
+
+RedeemBtn.MouseButton1Click:Connect(function()
+    PlayClick()
+    local code = string.gsub(CreditInput.Text, "%s+", "")
+    if code == "" or code == "EnterCode..." then return end
+
+    CreditInput.Text = "Checking..."
+    task.spawn(function()
+        local success, keyData = pcall(function() return game:HttpGet(LINK_KEY) end)
+        if success and keyData then
+            local isValid = false
+            -- แกะโค้ดจากไฟล์ pomelo_key.lua แบบ Real-time
+            for line in keyData:gmatch("[^\r\n]+") do
+                local extractedCode = line:match("CODE%d+%s*=%s*(%S+)")
+                if extractedCode and extractedCode == code then
+                    isValid = true
+                    break
+                end
+            end
+
+            if isValid then
+                CreditInput.TextColor3 = Color3.fromRGB(50, 255, 100)
+                CreditInput.Text = "SUCCESS!"
+                task.wait(1)
+                pcall(function() loadstring(game:HttpGet(LINK_MOD_CREDIT))() end)
+            else
+                CreditInput.TextColor3 = Color3.fromRGB(255, 60, 60)
+                CreditInput.Text = "INVALID"
+            end
+        else
+            CreditInput.TextColor3 = Color3.fromRGB(255, 60, 60)
+            CreditInput.Text = "ERROR"
+        end
+        task.wait(1.5)
+        CreditInput.TextColor3 = Color3.fromRGB(200, 200, 200)
+        CreditInput.Text = "Enter Code..."
+    end)
+end)
+
 local function CreateWindowBtn(text, posX, hoverColor, action)
     local Btn = Instance.new("TextButton")
     Btn.Parent = MainFrame
@@ -262,7 +334,7 @@ CreateWindowBtn("-", -90, Color3.fromRGB(50, 255, 100), function()
 end)
 
 FloatingBtn.MouseButton1Click:Connect(function()
-    if floatHasMoved then return end 
+    if floatHasMoved then return end
     PlayClick()
     local t = TweenService:Create(FloatingBtn, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Size = UDim2.new(0, 0, 0, 0)})
     t:Play()
@@ -286,7 +358,7 @@ TabListLayout.Parent = TabBar
 TabListLayout.FillDirection = Enum.FillDirection.Horizontal
 TabListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 TabListLayout.Padding = UDim.new(0, 8)
-TabListLayout.VerticalAlignment = Enum.VerticalAlignment.Center 
+TabListLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 
 local ContentContainer = Instance.new("Frame")
 ContentContainer.Parent = MainFrame
@@ -303,7 +375,7 @@ local TabsData = {}
 local function CreateTab(tabName, scriptContent)
     local TabBtn = Instance.new("TextButton")
     TabBtn.Parent = TabBar
-    TabBtn.Size = UDim2.new(0, 100, 0, 24) 
+    TabBtn.Size = UDim2.new(0, 100, 0, 24)
     TabBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 52)
     TabBtn.BackgroundTransparency = 0.2
     TabBtn.Text = tabName
@@ -313,7 +385,7 @@ local function CreateTab(tabName, scriptContent)
     Instance.new("UICorner", TabBtn).CornerRadius = UDim.new(0, 6)
     
     local Stroke, Gradient = ApplyGradientGlow(TabBtn, 1)
-    Stroke.Transparency = 1 
+    Stroke.Transparency = 1
     
     local PageFrame = Instance.new("Frame")
     PageFrame.Parent = ContentContainer
@@ -340,7 +412,7 @@ local function CreateTab(tabName, scriptContent)
         if not tabInfo.Loaded and scriptContent and scriptContent ~= "" then
             tabInfo.Loaded = true
             task.spawn(function()
-                _G.CurrentPomeloTab = PageFrame 
+                _G.CurrentPomeloTab = PageFrame
                 local func, err = loadstring(scriptContent)
                 if func then pcall(func) else warn("Error loading tab: " .. tabName .. " | Error: " .. tostring(err)) end
             end)
@@ -376,7 +448,7 @@ task.spawn(function()
                     currentName = string.match(tabNameMatch, "^%s*(.-)%s*$")
                 elseif currentName and string.match(line, "%[%.%.%.") then
                     inScript = true
-                    currentScriptCode = {} 
+                    currentScriptCode = {}
                 end
             else
                 if string.match(line, "%]%.%.%.") then

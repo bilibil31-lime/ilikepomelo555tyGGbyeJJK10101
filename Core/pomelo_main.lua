@@ -24,53 +24,45 @@ local function ApplyThemeStroke(parent, thickness, transparency)
 end
 
 -- ==========================================
--- NEW SYSTEM: เชื่อมต่อฐานข้อมูลจาก GitHub 
+-- SYSTEM: อ่านข้อมูลคีย์ให้ตรงกับหน้า Login
 -- ==========================================
-local userType = "Guest 👤"
+local userType = "Unverified ❌" -- เปลี่ยนจาก Guest เป็น Unverified หากไม่พบคีย์
 local userCredits = 0
 local expireTime = 0
 local isPermanent = false
-local LINK_KEY = "https://raw.githubusercontent.com/bilibil31-lime/ilikepomelo555tyGGbyeJJK10101/main/Core/pomelo_key.lua"
+
+local FOLDER_NAME = "Pomelo_System"
+local FILE_NAME = FOLDER_NAME .. "/SysData.cfg"
+
+local function DecodeData(dataStr)
+    local hexData = string.match(dataStr, "POMELO_SECURE_V1\n([%a%d]+)\nEOF")
+    if not hexData then return nil end
+    local rawData = (hexData:gsub("%x%x", function(c) return string.char(tonumber(c, 16)) end))
+    local k, t, e, c = string.match(rawData, "K:([^|]+)|T:([^|]+)|E:(%d+)|C:(%d+)")
+    if k and t and e and c then return {key = k, type = t, expire = tonumber(e), credits = tonumber(c)} end
+    return nil
+end
 
 local function CheckUserStatus()
-    -- สมมติว่าระบบหลัก (Main UI) มีการเซฟ Key หรือ Code ที่ผ่านการกรอกไว้ใน _G.PomeloVerifiedCode
-    local currentCode = _G.PomeloVerifiedCode or "" 
-    
-    -- เผื่อกรณีมีการเซฟโค้ดไว้ในไฟล์เครื่องแบบเก่าด้วย
-    local filePath = "Pomelo_System/SysData.cfg"
-    if isfile and isfile(filePath) and currentCode == "" then
-        local success, dataStr = pcall(readfile, filePath)
+    if isfile and isfile(FILE_NAME) then
+        local success, dataStr = pcall(readfile, FILE_NAME)
         if success then
-            currentCode = string.match(dataStr, "SAVED_CODE:([^|]+)") or currentCode
-        end
-    end
-
-    -- ปลอมโค้ดชั่วคราวสำหรับทดสอบเวลานับถอยหลัง (ถ้าต้องการเทสให้เอา -- ข้างหน้าบรรทัดล่างออก)
-    -- currentCode = "CODE1" 
-
-    if currentCode ~= "" then
-        local success, keyData = pcall(function() return game:HttpGet(LINK_KEY) end)
-        if success and keyData then
-            if string.match(keyData, "ADMIN KEY:%s*" .. currentCode) then
-                userType = "Admin 👑"
-                isPermanent = true
-                userCredits = 9999
+            local data = DecodeData(dataStr)
+            if data then
+                expireTime = data.expire
+                userCredits = data.credits
                 
-            elseif string.match(keyData, "friend key:%s*" .. currentCode) then
-                userType = "Friend 🤝"
-                isPermanent = true
-                userCredits = 9999
-                
-            else
-                for line in keyData:gmatch("[^\r\n]+") do
-                    local extCode = line:match("CODE%d+%s*=%s*(%S+)")
-                    if extCode and extCode == currentCode then
-                        userType = "Premium User 💎"
-                        isPermanent = false
-                        userCredits = 3 
-                        expireTime = os.time() + (24 * 60 * 60) -- ให้เวลา 24 ชั่วโมงจากปัจจุบัน
-                        break
-                    end
+                -- เช็คประเภทและตั้งค่าให้ตรงกับหน้าที่บันทึกคีย์มา
+                if data.type == "admin" then
+                    userType = "Admin 👑"
+                    isPermanent = true
+                elseif data.type == "friend" then
+                    userType = "Friend 🤝"
+                    -- ถ้าเวลาเกิน 10 ปี ให้ถือว่าถาวร
+                    if expireTime > os.time() + (3650 * 24 * 3600) then isPermanent = true end
+                elseif data.type == "user" then
+                    userType = "Normal User 👤" -- ผู้ใช้คีย์ธรรมดา 24 ชั่วโมง
+                    isPermanent = false
                 end
             end
         end
@@ -184,15 +176,14 @@ local CreditsLabel = CreateStatBadge("💎 Credits: <b>" .. (userCredits > 9000 
 CreateStatBadge("🎮 Device: <b>" .. deviceType .. "</b>")
 
 -- ==========================================
--- FIX: ระบบ Loop คำนวณและอัปเดตเวลานับถอยหลัง
+-- UPDATE: ระบบ Loop คำนวณเวลานับถอยหลัง
 -- ==========================================
 task.spawn(function()
     while task.wait(1) do
-        -- ถ้า UI ถูกทำลายให้หยุดลูปทันที ป้องกัน Error
         if not TimeLeftLabel or not TimeLeftLabel.Parent then break end
         
-        if userType == "Guest 👤" then
-            TimeLeftLabel.Text = "⏳ Time Left: <b>Guest ❌</b>"
+        if userType == "Unverified ❌" then
+            TimeLeftLabel.Text = "⏳ Time Left: <b>No Key ❌</b>"
         elseif isPermanent then
             TimeLeftLabel.Text = "⏳ Time Left: <b>Lifetime ♾️</b>"
         else
@@ -201,7 +192,6 @@ task.spawn(function()
             if diff <= 0 then
                 TimeLeftLabel.Text = "⏳ Time Left: <b>Expired ❌</b>"
             else
-                -- แปลงหน่วยเวลาให้สมบูรณ์ขึ้น มี "วัน" ด้วย
                 local days = math.floor(diff / 86400)
                 local hours = math.floor((diff % 86400) / 3600)
                 local minutes = math.floor((diff % 3600) / 60)
@@ -255,16 +245,19 @@ BottomText.Text = [[
 <font size='16' color='rgb(255,180,220)'><b>💎 ACCOUNT & PRIVILEGES 💎</b></font>
 <font size='11' color='rgb(200,200,200)'><i>"Live sync with Pomelo Security Protocols"</i></font>
 
-<font color='rgb(255,100,180)'><b>🔹 Script Access & Authentication</b></font>
-• <b>Premium User:</b> Verified via valid CODE (e.g., CODE1, CODE2). Grants execution access to premium mod_credit scripts.
-• <b>Admin / Friend:</b> Unlocks exclusive <b>Unlimited</b> bypass, lifetime access, and developer features!
+<font color='rgb(255,100,180)'><b>🔹 Status (สถานะผู้ใช้งาน)</b></font>
+• <b>Normal User:</b> ระดับปกติ ได้รับจากการหาคีย์ฟรี (อายุใช้งาน 24 ชั่วโมง)
+• <b>Friend / Admin:</b> ระดับพิเศษ สิทธิ์แบบถาวรและฟังก์ชันเข้าถึงสคริปต์ขั้นสูง
 
-<font color='rgb(255,100,180)'><b>🔹 Real-time Validation System</b></font>
-• Your status is actively synchronized with the main Pomelo key database. 
-• If a code expires or is revoked remotely, the system will instantly downgrade the session to maintain strict security.
+<font color='rgb(255,100,180)'><b>🔹 Time Left (เวลาคงเหลือ)</b></font>
+• แสดงเวลานับถอยหลังก่อนที่คีย์ปัจจุบันจะหมดอายุ หากเวลาเป็น 0 คุณจะต้องไปรับคีย์ใหม่ผ่านระบบเพื่อเข้าใช้งานอีกครั้ง
 
-<font color='rgb(255,100,180)'><b>🔹 Device Optimization</b></font>
-• Core execution is automatically tailored to your current platform (PC/Mobile/Console) to guarantee maximum stability.
+<font color='rgb(255,100,180)'><b>🔹 Credits (เครดิตการเข้าใช้)</b></font>
+• <b>Normal User:</b> จำกัดเครดิตการรันสคริปต์ ระบบจะหักเครดิตทุกครั้งที่รันเพื่อป้องกันการสแปม
+• <b>Friend / Admin:</b> ใช้งานได้แบบ Unlimited ไม่มีวันหมด
+
+<font color='rgb(255,100,180)'><b>🔹 Device (อุปกรณ์)</b></font>
+• ระบบจะตรวจสอบอุปกรณ์ (PC / Mobile / Console) อัตโนมัติเพื่อรีดประสิทธิภาพการประมวลผลสคริปต์ให้เสถียรที่สุด
 
 <font color='rgb(255,150,150)'><i>💖 Secure, Reliable, and Engineered for Excellence 💖</i></font>
 ]]

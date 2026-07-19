@@ -23,9 +23,11 @@ local function ApplyThemeStroke(parent, thickness, transparency)
     Gradient.Rotation = 45
 end
 
--- อ่านไฟล์เซฟคีย์เพื่อเช็คสถานะและเครดิต
+-- อ่านไฟล์เซฟคีย์เพื่อเช็คสถานะ เครดิต และเวลาหมดอายุ
 local userType = "Guest 👤"
 local userCredits = 0
+local expireTime = 0
+local isPermanent = false
 
 local function DecodeLocalData()
     local filePath = "Pomelo_System/SysData.cfg"
@@ -34,13 +36,18 @@ local function DecodeLocalData()
         local hexData = string.match(dataStr, "POMELO_SECURE_V1\n([%a%d]+)\nEOF")
         if not hexData then return end
         local rawData = (hexData:gsub("%x%x", function(c) return string.char(tonumber(c, 16)) end))
-        local _, t, _, c = string.match(rawData, "K:([^|]+)|T:([^|]+)|E:(%d+)|C:(%d+)")
-        if t and c then
-            if t == "admin" then userType = "Admin 👑"
-            elseif t == "friend" then userType = "Friend 🤝"
-            elseif t == "normal" then userType = "Normal User 👤"
+        local k, t, e, c = string.match(rawData, "K:([^|]+)|T:([^|]+)|E:(%d+)|C:(%d+)")
+        if t and e and c then
+            if t == "admin" then 
+                userType = "Admin 👑"
+                isPermanent = true
+            elseif t == "friend" then 
+                userType = "Friend 🤝"
+            elseif t == "normal" then 
+                userType = "Normal User 👤"
             end
             userCredits = tonumber(c)
+            expireTime = tonumber(e) or 0
         end
     end
 end
@@ -119,6 +126,7 @@ StatLayout.SortOrder = Enum.SortOrder.LayoutOrder
 StatLayout.Padding = UDim.new(0, 4)
 StatLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 
+-- ปรับให้ส่งค่า TextLabel กลับมาเพื่อเอาไปทำ Loop นับเวลาถอยหลังได้
 local function CreateStatBadge(text)
     local Badge = Instance.new("Frame", StatsContainer)
     Badge.Size = UDim2.new(1, 0, 0, 24)
@@ -141,12 +149,39 @@ local function CreateStatBadge(text)
     Lbl.TextSize = 12
     Lbl.TextXAlignment = Enum.TextXAlignment.Left
     Lbl.RichText = true 
+    return Lbl
 end
 
-CreateStatBadge("⏳ Age: <b>" .. tostring(Player.AccountAge) .. "</b> Days")
+-- สร้างป้ายเก็บไว้ในตัวแปรเพื่อใช้ทำระบบ Real-time countdown
+local TimeLeftLabel = CreateStatBadge("⏳ Time Left: <b>Calculating...</b>")
 CreateStatBadge("⭐ Status: <b>" .. userType .. "</b>")
 CreateStatBadge("💎 Credits: <b>" .. (userCredits > 9000 and "Unlimited" or tostring(userCredits)) .. "</b>")
 CreateStatBadge("🎮 Device: <b>" .. deviceType .. "</b>")
+
+-- ระบบ Loop คำนวณและอัปเดตเวลานับถอยหลังวินาทิต่อวินาที
+task.spawn(function()
+    while task.wait(1) do
+        if not TimeLeftLabel or not TimeLeftLabel.Parent then break end
+        if userType == "Guest 👤" then
+            TimeLeftLabel.Text = "⏳ Time Left: <b>Expired ❌</b>"
+            break
+        elseif isPermanent then
+            TimeLeftLabel.Text = "⏳ Time Left: <b>Lifetime ♾️</b>"
+            break
+        else
+            local diff = expireTime - os.time()
+            if diff <= 0 then
+                TimeLeftLabel.Text = "⏳ Time Left: <b>Expired ❌</b>"
+                break
+            else
+                local hours = math.floor(diff / 3600)
+                local minutes = math.floor((diff % 3600) / 60)
+                local seconds = diff % 60
+                TimeLeftLabel.Text = string.format("⏳ Time Left: <b>%02dh %02dm %02ds</b>", hours, minutes, seconds)
+            end
+        end
+    end
+end)
 
 local FooterContainer = Instance.new("ScrollingFrame", TabContainer)
 FooterContainer.Size = UDim2.new(1, -20, 1, -165)

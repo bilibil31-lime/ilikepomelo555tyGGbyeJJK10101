@@ -2,4 +2,4 @@
 [2] Studow 
 [3] Normal 
 _____________
-Answer=3
+Answer=1

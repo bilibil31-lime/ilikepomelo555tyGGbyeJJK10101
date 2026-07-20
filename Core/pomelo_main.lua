@@ -334,7 +334,7 @@ local AntiAfkConnection = nil
 -- [[ ================================================================= ]]
 
 
--- [[ ========================= โซนเพิ่มปุ่มของคุณ ========================== ]]
+-- [[ ========================= โซนเพิ่มปุ่มของกุ ========================== ]]
 
 CreateSection("🚀 Performance")
 
@@ -361,9 +361,11 @@ CreateToggle("Low Detail Mode (FPS Boost)", "Removes textures and turns material
     end
 end)
 -- 2.../
---3...\
+
+-- 3...\
 CreateToggle("igihjigjigjbg", "thothotkhoktohktoht", false, function(state)
---3.../
+end)
+-- 3.../
 
 CreateSection("👁️ Visuals")
 

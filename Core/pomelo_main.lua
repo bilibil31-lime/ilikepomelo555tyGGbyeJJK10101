@@ -449,7 +449,10 @@ local MenuConfig = {
             },
             -- 2.../
             
-            -- ถ้าอยากเพิ่มปุ่มที่ 3 ก็คัดลอก { ... } มาวางต่อท้ายตรงนี้ได้เลย
+            -- 3...\
+             Title = "youiiiiiiy",
+                Description = "koioioiooiio",
+            --3.../
         }
     },
 

@@ -336,6 +336,59 @@ local AntiAfkConnection = nil
 
 -- [[ ========================= โซนเพิ่มปุ่มของกุ ========================== ]]
 
+local smoothOriginalMaterials = {}
+local smoothHiddenTextures = {}
+
+CreateSection("🎨 Graphics")
+
+-- 1...\
+CreateToggle("Ultra Smooth Graphics", "Adjusts colors and makes the world smooth for better FPS.", false, function(state)
+    local Lighting = game:GetService("Lighting")
+    
+    if state then
+        local bloom = Lighting:FindFirstChild("PomeloBloom") or Instance.new("BloomEffect", Lighting)
+        bloom.Name = "PomeloBloom"
+        bloom.Intensity, bloom.Size, bloom.Threshold = 0.2, 5, 0.8
+
+        local cc = Lighting:FindFirstChild("PomeloCC") or Instance.new("ColorCorrectionEffect", Lighting)
+        cc.Name = "PomeloCC"
+        cc.Brightness, cc.Contrast, cc.Saturation = 0.05, 0.1, 0.3
+        cc.TintColor = Color3.fromRGB(255, 245, 250)
+
+        local atmos = Lighting:FindFirstChild("PomeloAtmos") or Instance.new("Atmosphere", Lighting)
+        atmos.Name = "PomeloAtmos"
+        atmos.Density = 0.2
+
+        for _, v in pairs(workspace:GetDescendants()) do
+            if v:IsA("BasePart") and not v.Parent:FindFirstChild("Humanoid") then
+                if not smoothOriginalMaterials[v] then 
+                    smoothOriginalMaterials[v] = v.Material 
+                end
+                v.Material = Enum.Material.SmoothPlastic
+            elseif v:IsA("Decal") or v:IsA("Texture") then
+                if not smoothHiddenTextures[v] then 
+                    smoothHiddenTextures[v] = v.Transparency 
+                end
+                v.Transparency = 1
+            end
+        end
+    else
+        if Lighting:FindFirstChild("PomeloBloom") then Lighting.PomeloBloom:Destroy() end
+        if Lighting:FindFirstChild("PomeloCC") then Lighting.PomeloCC:Destroy() end
+        if Lighting:FindFirstChild("PomeloAtmos") then Lighting.PomeloAtmos:Destroy() end
+
+        for part, mat in pairs(smoothOriginalMaterials) do
+            if part and part.Parent then part.Material = mat end
+        end
+        for tex, trans in pairs(smoothHiddenTextures) do
+            if tex and tex.Parent then tex.Transparency = trans end
+        end
+        table.clear(smoothOriginalMaterials)
+        table.clear(smoothHiddenTextures)
+    end
+end)
+-- 1.../
+
 CreateSection("🚀 Performance")
 
 -- 1...\

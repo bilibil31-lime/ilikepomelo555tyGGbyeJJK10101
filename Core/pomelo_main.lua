@@ -270,7 +270,7 @@ BottomText.Text = [[
 <font color='rgb(255,150,150)'><i>💖 Secure, Reliable, and Engineered for Excellence 💖</i></font>
 ]]
 ]...
-TAB2 name=Main2
+TAB2 name=Setting
 [...
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -284,7 +284,8 @@ local TabContainer = _G.CurrentPomeloTab
 if not TabContainer then return end
 
 -- ==========================================
--- SYSTEM: ฟังก์ชันตกแต่งกรอบ (Theme)
+-- SYSTEM: ฟังก์ชันตกแต่งกรอบ (Theme) & สร้าง UI 
+-- (ส่วนนี้คุณไม่ต้องไปแก้ไขมันแล้ว ปล่อยให้มันทำงานเอง)
 -- ==========================================
 local function ApplyThemeStroke(parent, thickness, transparency)
     local Stroke = Instance.new("UIStroke", parent)
@@ -302,9 +303,6 @@ local function ApplyThemeStroke(parent, thickness, transparency)
     Gradient.Rotation = 45
 end
 
--- ==========================================
--- UI: สร้างพื้นที่ Scrolling สำหรับ Settings
--- ==========================================
 local SettingsScroll = Instance.new("ScrollingFrame", TabContainer)
 SettingsScroll.Size = UDim2.new(1, -20, 1, -20)
 SettingsScroll.Position = UDim2.new(0, 10, 0, 10)
@@ -320,11 +318,6 @@ ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 ListLayout.Padding = UDim.new(0, 10)
 ListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
--- ==========================================
--- COMPONENTS: ฟังก์ชันสร้างหมวดหมู่และปุ่มเปิด-ปิด
--- ==========================================
-
--- 1. ฟังก์ชันสร้างหัวข้อ (Section Header)
 local function CreateSection(title)
     local SectionLabel = Instance.new("TextLabel", SettingsScroll)
     SectionLabel.Size = UDim2.new(1, -10, 0, 25)
@@ -343,7 +336,6 @@ local function CreateSection(title)
     Line.BackgroundTransparency = 0.5
 end
 
--- 2. ฟังก์ชันสร้างปุ่ม Toggle (สวิตช์เปิด-ปิด)
 local function CreateToggle(title, description, defaultState, callback)
     local ToggleFrame = Instance.new("TextButton", SettingsScroll)
     ToggleFrame.Size = UDim2.new(1, -10, 0, 50)
@@ -399,86 +391,155 @@ local function CreateToggle(title, description, defaultState, callback)
         pcall(callback, isOn)
     end)
     
-    -- รันค่าเริ่มต้นตอนสร้างเสร็จ
     task.spawn(function()
         if defaultState then pcall(callback, defaultState) end
     end)
 end
 
 -- ==========================================
--- SETTINGS: ใส่ฟังก์ชันต่างๆ
+-- เตรียมตัวแปรที่ต้องใช้ในสคริปต์ (เช่น ค่าแสงเดิม, ตัวแปร Anti-AFK)
 -- ==========================================
-
-CreateSection("🚀 Performance")
-
-CreateToggle("Unlock FPS", "Bypass standard 60 FPS limit (Executor Supported)", false, function(state)
-    pcall(function()
-        if setfpscap then
-            setfpscap(state and 999 or 60)
-        end
-    end)
-end)
-
-CreateToggle("Low Detail Mode (FPS Boost)", "Removes textures and turns materials to smooth plastic.", false, function(state)
-    if state then
-        for _, v in pairs(workspace:GetDescendants()) do
-            if v:IsA("BasePart") and not v.Parent:FindFirstChild("Humanoid") then
-                v.Material = Enum.Material.SmoothPlastic
-            elseif v:IsA("Decal") or v:IsA("Texture") then
-                v.Transparency = 1
-            end
-        end
-    end
-end)
-
-
-CreateSection("👁️ Visuals")
-
 local OriginalLighting = {
     Ambient = Lighting.Ambient,
     Brightness = Lighting.Brightness,
     GlobalShadows = Lighting.GlobalShadows,
     FogEnd = Lighting.FogEnd
 }
+local AntiAfkConnection = nil
 
-CreateToggle("Fullbright", "Removes shadows and makes the map bright.", false, function(state)
-    if state then
-        Lighting.Ambient = Color3.fromRGB(255, 255, 255)
-        Lighting.Brightness = 2
-        Lighting.GlobalShadows = false
-    else
-        Lighting.Ambient = OriginalLighting.Ambient
-        Lighting.Brightness = OriginalLighting.Brightness
-        Lighting.GlobalShadows = OriginalLighting.GlobalShadows
+
+-- ==========================================
+-- 🛠️ โซนตั้งค่า (คุณสามารถแก้ไข เพิ่ม/ลบ ตรงนี้ได้เลย จัดรูปแบบให้แล้ว)
+-- ==========================================
+local MenuConfig = {
+    
+    -- Section 1: Performance ==============================
+    {
+        SectionName = "🚀 Performance",
+        Toggles = {
+            -- 1...\ (ปุ่มที่ 1)
+            {
+                Title = "Unlock FPS",
+                Description = "Bypass standard 60 FPS limit (Executor Supported)",
+                Default = false,
+                ScriptCode = function(state)
+                    pcall(function()
+                        if setfpscap then setfpscap(state and 999 or 60) end
+                    end)
+                end
+            },
+            -- 1.../
+            
+            -- 2...\ (ปุ่มที่ 2)
+            {
+                Title = "Low Detail Mode (FPS Boost)",
+                Description = "Removes textures and turns materials to smooth plastic.",
+                Default = false,
+                ScriptCode = function(state)
+                    if state then
+                        for _, v in pairs(workspace:GetDescendants()) do
+                            if v:IsA("BasePart") and not v.Parent:FindFirstChild("Humanoid") then
+                                v.Material = Enum.Material.SmoothPlastic
+                            elseif v:IsA("Decal") or v:IsA("Texture") then
+                                v.Transparency = 1
+                            end
+                        end
+                    end
+                end
+            },
+            -- 2.../
+            
+            -- ถ้าอยากเพิ่มปุ่มที่ 3 ก็คัดลอก { ... } มาวางต่อท้ายตรงนี้ได้เลย
+        }
+    },
+
+    -- Section 2: Visuals ==================================
+    {
+        SectionName = "👁️ Visuals",
+        Toggles = {
+            -- 1...\
+            {
+                Title = "Fullbright",
+                Description = "Removes shadows and makes the map bright.",
+                Default = false,
+                ScriptCode = function(state)
+                    if state then
+                        Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+                        Lighting.Brightness = 2
+                        Lighting.GlobalShadows = false
+                    else
+                        Lighting.Ambient = OriginalLighting.Ambient
+                        Lighting.Brightness = OriginalLighting.Brightness
+                        Lighting.GlobalShadows = OriginalLighting.GlobalShadows
+                    end
+                end
+            },
+            -- 1.../
+            
+            -- 2...\
+            {
+                Title = "No Fog",
+                Description = "Removes atmosphere fog for infinite sight.",
+                Default = false,
+                ScriptCode = function(state)
+                    if state then
+                        Lighting.FogEnd = 100000
+                    else
+                        Lighting.FogEnd = OriginalLighting.FogEnd
+                    end
+                end
+            },
+            -- 2.../
+        }
+    },
+
+    -- Section 3: System ===================================
+    {
+        SectionName = "⚙️ System",
+        Toggles = {
+            -- 1...\
+            {
+                Title = "Anti-AFK",
+                Description = "Prevents 20-minute idle kick.",
+                Default = true,
+                ScriptCode = function(state)
+                    if state then
+                        AntiAfkConnection = Player.Idled:Connect(function()
+                            VirtualUser:CaptureController()
+                            VirtualUser:ClickButton2(Vector2.new())
+                        end)
+                    else
+                        if AntiAfkConnection then
+                            AntiAfkConnection:Disconnect()
+                            AntiAfkConnection = nil
+                        end
+                    end
+                end
+            },
+            -- 1.../
+        }
+    },
+    
+    -- สร้าง Section ที่ 4 เพิ่มได้ที่นี่ แค่คัดลอกรูปแบบด้านบนมาใส่...
+}
+
+-- ==========================================
+-- ระบบ Auto-Generator (ดึงข้อมูลจาก MenuConfig มาสร้าง UI อัตโนมัติ)
+-- ==========================================
+for _, sectionData in ipairs(MenuConfig) do
+    -- 1. สร้างหัวข้อ Section
+    CreateSection(sectionData.SectionName)
+    
+    -- 2. วนลูปสร้างปุ่ม Toggle ทั้งหมดที่อยู่ใน Section นั้น
+    for _, toggleData in ipairs(sectionData.Toggles) do
+        CreateToggle(
+            toggleData.Title, 
+            toggleData.Description, 
+            toggleData.Default, 
+            toggleData.ScriptCode
+        )
     end
-end)
-
-CreateToggle("No Fog", "Removes atmosphere fog for infinite sight.", false, function(state)
-    if state then
-        Lighting.FogEnd = 100000
-    else
-        Lighting.FogEnd = OriginalLighting.FogEnd
-    end
-end)
-
-
-CreateSection("⚙️ System")
-
-local AntiAfkConnection
-CreateToggle("Anti-AFK", "Prevents 20-minute idle kick.", true, function(state)
-    if state then
-        AntiAfkConnection = Player.Idled:Connect(function()
-            VirtualUser:CaptureController()
-            VirtualUser:ClickButton2(Vector2.new())
-        end)
-    else
-        if AntiAfkConnection then
-            AntiAfkConnection:Disconnect()
-            AntiAfkConnection = nil
-        end
-    end
-end)
-
+end
 ]...
 
 TAB3 name=Main3

@@ -361,7 +361,9 @@ CreateToggle("Low Detail Mode (FPS Boost)", "Removes textures and turns material
     end
 end)
 -- 2.../
-
+--3...\
+CreateToggle("igihjigjigjbg", "thothotkhoktohktoht", false, function(state)
+--3.../
 
 CreateSection("👁️ Visuals")
 

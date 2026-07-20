@@ -275,274 +275,138 @@ TAB2 name=Setting
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local Lighting = game:GetService("Lighting")
-local RunService = game:GetService("RunService")
 local VirtualUser = game:GetService("VirtualUser")
-
 local Player = Players.LocalPlayer
-
 local TabContainer = _G.CurrentPomeloTab
 if not TabContainer then return end
 
--- ==========================================
--- SYSTEM: ฟังก์ชันตกแต่งกรอบ (Theme) & สร้าง UI 
--- (ส่วนนี้คุณไม่ต้องไปแก้ไขมันแล้ว ปล่อยให้มันทำงานเอง)
--- ==========================================
+-- [[ ================== CORE UI LOGIC (ห้ามแก้ตรงนี้) ================== ]]
 local function ApplyThemeStroke(parent, thickness, transparency)
     local Stroke = Instance.new("UIStroke", parent)
-    Stroke.Color = Color3.fromRGB(255, 255, 255)
-    Stroke.Thickness = thickness or 1
-    Stroke.Transparency = transparency or 0.2
+    Stroke.Color, Stroke.Thickness, Stroke.Transparency = Color3.fromRGB(255, 255, 255), thickness or 1, transparency or 0.2
     Stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border 
-    
     local Gradient = Instance.new("UIGradient", Stroke)
-    Gradient.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 100, 180)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 200, 255)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 100, 180))
-    })
+    Gradient.Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 100, 180)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 200, 255)), ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 100, 180))})
     Gradient.Rotation = 45
 end
-
 local SettingsScroll = Instance.new("ScrollingFrame", TabContainer)
-SettingsScroll.Size = UDim2.new(1, -20, 1, -20)
-SettingsScroll.Position = UDim2.new(0, 10, 0, 10)
-SettingsScroll.BackgroundTransparency = 1
-SettingsScroll.BorderSizePixel = 0
-SettingsScroll.ScrollBarThickness = 3 
-SettingsScroll.ScrollBarImageColor3 = Color3.fromRGB(255, 100, 180) 
-SettingsScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-SettingsScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y 
-
+SettingsScroll.Size, SettingsScroll.Position = UDim2.new(1, -20, 1, -20), UDim2.new(0, 10, 0, 10)
+SettingsScroll.BackgroundTransparency, SettingsScroll.BorderSizePixel = 1, 0
+SettingsScroll.ScrollBarThickness, SettingsScroll.ScrollBarImageColor3 = 3, Color3.fromRGB(255, 100, 180)
+SettingsScroll.CanvasSize, SettingsScroll.AutomaticCanvasSize = UDim2.new(0, 0, 0, 0), Enum.AutomaticSize.Y
 local ListLayout = Instance.new("UIListLayout", SettingsScroll)
-ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-ListLayout.Padding = UDim.new(0, 10)
-ListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-
+ListLayout.SortOrder, ListLayout.Padding, ListLayout.HorizontalAlignment = Enum.SortOrder.LayoutOrder, UDim.new(0, 10), Enum.HorizontalAlignment.Center
 local function CreateSection(title)
     local SectionLabel = Instance.new("TextLabel", SettingsScroll)
-    SectionLabel.Size = UDim2.new(1, -10, 0, 25)
-    SectionLabel.BackgroundTransparency = 1
-    SectionLabel.Text = "  " .. title
-    SectionLabel.TextColor3 = Color3.fromRGB(255, 150, 220)
-    SectionLabel.Font = Enum.Font.GothamBold
-    SectionLabel.TextSize = 14
+    SectionLabel.Size, SectionLabel.BackgroundTransparency = UDim2.new(1, -10, 0, 25), 1
+    SectionLabel.Text, SectionLabel.TextColor3, SectionLabel.Font, SectionLabel.TextSize = "  " .. title, Color3.fromRGB(255, 150, 220), Enum.Font.GothamBold, 14
     SectionLabel.TextXAlignment = Enum.TextXAlignment.Left
-    
     local Line = Instance.new("Frame", SectionLabel)
-    Line.Size = UDim2.new(1, -10, 0, 1)
-    Line.Position = UDim2.new(0, 10, 1, 0)
-    Line.BackgroundColor3 = Color3.fromRGB(255, 100, 180)
-    Line.BorderSizePixel = 0
-    Line.BackgroundTransparency = 0.5
+    Line.Size, Line.Position, Line.BackgroundColor3, Line.BorderSizePixel, Line.BackgroundTransparency = UDim2.new(1, -10, 0, 1), UDim2.new(0, 10, 1, 0), Color3.fromRGB(255, 100, 180), 0, 0.5
 end
-
 local function CreateToggle(title, description, defaultState, callback)
     local ToggleFrame = Instance.new("TextButton", SettingsScroll)
-    ToggleFrame.Size = UDim2.new(1, -10, 0, 50)
-    ToggleFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
-    ToggleFrame.BackgroundTransparency = 0.5
-    ToggleFrame.Text = ""
-    ToggleFrame.AutoButtonColor = false
+    ToggleFrame.Size, ToggleFrame.BackgroundColor3, ToggleFrame.BackgroundTransparency, ToggleFrame.Text, ToggleFrame.AutoButtonColor = UDim2.new(1, -10, 0, 50), Color3.fromRGB(35, 35, 42), 0.5, "", false
     Instance.new("UICorner", ToggleFrame).CornerRadius = UDim.new(0, 8)
     ApplyThemeStroke(ToggleFrame, 1, 0.4)
-    
     local TitleLabel = Instance.new("TextLabel", ToggleFrame)
-    TitleLabel.Size = UDim2.new(0.7, 0, 0, 20)
-    TitleLabel.Position = UDim2.new(0, 15, 0, 8)
-    TitleLabel.BackgroundTransparency = 1
-    TitleLabel.Text = title
-    TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    TitleLabel.Font = Enum.Font.GothamBold
-    TitleLabel.TextSize = 14
-    TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    
+    TitleLabel.Size, TitleLabel.Position, TitleLabel.BackgroundTransparency, TitleLabel.Text, TitleLabel.TextColor3, TitleLabel.Font, TitleLabel.TextSize, TitleLabel.TextXAlignment = UDim2.new(0.7, 0, 0, 20), UDim2.new(0, 15, 0, 8), 1, title, Color3.fromRGB(255, 255, 255), Enum.Font.GothamBold, 14, Enum.TextXAlignment.Left
     local DescLabel = Instance.new("TextLabel", ToggleFrame)
-    DescLabel.Size = UDim2.new(0.7, 0, 0, 15)
-    DescLabel.Position = UDim2.new(0, 15, 0, 28)
-    DescLabel.BackgroundTransparency = 1
-    DescLabel.Text = description
-    DescLabel.TextColor3 = Color3.fromRGB(150, 150, 160)
-    DescLabel.Font = Enum.Font.Gotham
-    DescLabel.TextSize = 11
-    DescLabel.TextXAlignment = Enum.TextXAlignment.Left
-
+    DescLabel.Size, DescLabel.Position, DescLabel.BackgroundTransparency, DescLabel.Text, DescLabel.TextColor3, DescLabel.Font, DescLabel.TextSize, DescLabel.TextXAlignment = UDim2.new(0.7, 0, 0, 15), UDim2.new(0, 15, 0, 28), 1, description, Color3.fromRGB(150, 150, 160), Enum.Font.Gotham, 11, Enum.TextXAlignment.Left
     local SwitchBG = Instance.new("Frame", ToggleFrame)
-    SwitchBG.Size = UDim2.new(0, 40, 0, 20)
-    SwitchBG.Position = UDim2.new(1, -55, 0.5, -10)
-    SwitchBG.BackgroundColor3 = defaultState and Color3.fromRGB(255, 100, 180) or Color3.fromRGB(50, 50, 60)
+    SwitchBG.Size, SwitchBG.Position, SwitchBG.BackgroundColor3 = UDim2.new(0, 40, 0, 20), UDim2.new(1, -55, 0.5, -10), defaultState and Color3.fromRGB(255, 100, 180) or Color3.fromRGB(50, 50, 60)
     Instance.new("UICorner", SwitchBG).CornerRadius = UDim.new(1, 0)
-    
     local SwitchCircle = Instance.new("Frame", SwitchBG)
-    SwitchCircle.Size = UDim2.new(0, 16, 0, 16)
-    SwitchCircle.Position = defaultState and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
-    SwitchCircle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    SwitchCircle.Size, SwitchCircle.Position, SwitchCircle.BackgroundColor3 = UDim2.new(0, 16, 0, 16), defaultState and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8), Color3.fromRGB(255, 255, 255)
     Instance.new("UICorner", SwitchCircle).CornerRadius = UDim.new(1, 0)
-
     local isOn = defaultState
     ToggleFrame.MouseButton1Click:Connect(function()
         isOn = not isOn
-        
-        local targetColor = isOn and Color3.fromRGB(255, 100, 180) or Color3.fromRGB(50, 50, 60)
-        local targetPos = isOn and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
-        
-        TweenService:Create(SwitchBG, TweenInfo.new(0.2), {BackgroundColor3 = targetColor}):Play()
-        TweenService:Create(SwitchCircle, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Position = targetPos}):Play()
-        
+        TweenService:Create(SwitchBG, TweenInfo.new(0.2), {BackgroundColor3 = isOn and Color3.fromRGB(255, 100, 180) or Color3.fromRGB(50, 50, 60)}):Play()
+        TweenService:Create(SwitchCircle, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Position = isOn and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)}):Play()
         pcall(callback, isOn)
     end)
-    
-    task.spawn(function()
-        if defaultState then pcall(callback, defaultState) end
-    end)
+    task.spawn(function() if defaultState then pcall(callback, defaultState) end end)
 end
 
--- ==========================================
--- เตรียมตัวแปรที่ต้องใช้ในสคริปต์ (เช่น ค่าแสงเดิม, ตัวแปร Anti-AFK)
--- ==========================================
-local OriginalLighting = {
-    Ambient = Lighting.Ambient,
-    Brightness = Lighting.Brightness,
-    GlobalShadows = Lighting.GlobalShadows,
-    FogEnd = Lighting.FogEnd
-}
+local OriginalLighting = { Ambient = Lighting.Ambient, Brightness = Lighting.Brightness, GlobalShadows = Lighting.GlobalShadows, FogEnd = Lighting.FogEnd }
 local AntiAfkConnection = nil
+-- [[ ================================================================= ]]
 
 
--- ==========================================
--- 🛠️ โซนตั้งค่า (คุณสามารถแก้ไข เพิ่ม/ลบ ตรงนี้ได้เลย จัดรูปแบบให้แล้ว)
--- ==========================================
-local MenuConfig = {
-    
-    -- Section 1: Performance ==============================
-    {
-        SectionName = "🚀 Performance",
-        Toggles = {
-            -- 1...\ (ปุ่มที่ 1)
-            {
-                Title = "Unlock FPS",
-                Description = "Bypass standard 60 FPS limit (Executor Supported)",
-                Default = false,
-                ScriptCode = function(state)
-                    pcall(function()
-                        if setfpscap then setfpscap(state and 999 or 60) end
-                    end)
-                end
-            },
-            -- 1.../
-            
-            -- 2...\ (ปุ่มที่ 2)
-            {
-                Title = "Low Detail Mode (FPS Boost)",
-                Description = "Removes textures and turns materials to smooth plastic.",
-                Default = false,
-                ScriptCode = function(state)
-                    if state then
-                        for _, v in pairs(workspace:GetDescendants()) do
-                            if v:IsA("BasePart") and not v.Parent:FindFirstChild("Humanoid") then
-                                v.Material = Enum.Material.SmoothPlastic
-                            elseif v:IsA("Decal") or v:IsA("Texture") then
-                                v.Transparency = 1
-                            end
-                        end
-                    end
-                end
-            },
-            -- 2.../
-            
-            -- 3...\
-             Title = "youiiiiiiy",
-                Description = "koioioiooiio",
-            --3.../
-        }
-    },
+-- [[ ========================= โซนเพิ่มปุ่มของคุณ ========================== ]]
 
-    -- Section 2: Visuals ==================================
-    {
-        SectionName = "👁️ Visuals",
-        Toggles = {
-            -- 1...\
-            {
-                Title = "Fullbright",
-                Description = "Removes shadows and makes the map bright.",
-                Default = false,
-                ScriptCode = function(state)
-                    if state then
-                        Lighting.Ambient = Color3.fromRGB(255, 255, 255)
-                        Lighting.Brightness = 2
-                        Lighting.GlobalShadows = false
-                    else
-                        Lighting.Ambient = OriginalLighting.Ambient
-                        Lighting.Brightness = OriginalLighting.Brightness
-                        Lighting.GlobalShadows = OriginalLighting.GlobalShadows
-                    end
-                end
-            },
-            -- 1.../
-            
-            -- 2...\
-            {
-                Title = "No Fog",
-                Description = "Removes atmosphere fog for infinite sight.",
-                Default = false,
-                ScriptCode = function(state)
-                    if state then
-                        Lighting.FogEnd = 100000
-                    else
-                        Lighting.FogEnd = OriginalLighting.FogEnd
-                    end
-                end
-            },
-            -- 2.../
-        }
-    },
+CreateSection("🚀 Performance")
 
-    -- Section 3: System ===================================
-    {
-        SectionName = "⚙️ System",
-        Toggles = {
-            -- 1...\
-            {
-                Title = "Anti-AFK",
-                Description = "Prevents 20-minute idle kick.",
-                Default = true,
-                ScriptCode = function(state)
-                    if state then
-                        AntiAfkConnection = Player.Idled:Connect(function()
-                            VirtualUser:CaptureController()
-                            VirtualUser:ClickButton2(Vector2.new())
-                        end)
-                    else
-                        if AntiAfkConnection then
-                            AntiAfkConnection:Disconnect()
-                            AntiAfkConnection = nil
-                        end
-                    end
-                end
-            },
-            -- 1.../
-        }
-    },
-    
-    -- สร้าง Section ที่ 4 เพิ่มได้ที่นี่ แค่คัดลอกรูปแบบด้านบนมาใส่...
-}
+-- 1...\
+CreateToggle("Unlock FPS", "Bypass standard 60 FPS limit", false, function(state)
+    pcall(function()
+        if setfpscap then
+            setfpscap(state and 999 or 60)
+        end
+    end)
+end)
+-- 1.../
 
--- ==========================================
--- ระบบ Auto-Generator (ดึงข้อมูลจาก MenuConfig มาสร้าง UI อัตโนมัติ)
--- ==========================================
-for _, sectionData in ipairs(MenuConfig) do
-    -- 1. สร้างหัวข้อ Section
-    CreateSection(sectionData.SectionName)
-    
-    -- 2. วนลูปสร้างปุ่ม Toggle ทั้งหมดที่อยู่ใน Section นั้น
-    for _, toggleData in ipairs(sectionData.Toggles) do
-        CreateToggle(
-            toggleData.Title, 
-            toggleData.Description, 
-            toggleData.Default, 
-            toggleData.ScriptCode
-        )
+-- 2...\
+CreateToggle("Low Detail Mode (FPS Boost)", "Removes textures and turns materials to smooth plastic.", false, function(state)
+    if state then
+        for _, v in pairs(workspace:GetDescendants()) do
+            if v:IsA("BasePart") and not v.Parent:FindFirstChild("Humanoid") then
+                v.Material = Enum.Material.SmoothPlastic
+            elseif v:IsA("Decal") or v:IsA("Texture") then
+                v.Transparency = 1
+            end
+        end
     end
-end
+end)
+-- 2.../
+
+
+CreateSection("👁️ Visuals")
+
+-- 1...\
+CreateToggle("Fullbright", "Removes shadows and makes the map bright.", false, function(state)
+    if state then
+        Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+        Lighting.Brightness = 2
+        Lighting.GlobalShadows = false
+    else
+        Lighting.Ambient = OriginalLighting.Ambient
+        Lighting.Brightness = OriginalLighting.Brightness
+        Lighting.GlobalShadows = OriginalLighting.GlobalShadows
+    end
+end)
+-- 1.../
+
+-- 2...\
+CreateToggle("No Fog", "Removes atmosphere fog for infinite sight.", false, function(state)
+    if state then
+        Lighting.FogEnd = 100000
+    else
+        Lighting.FogEnd = OriginalLighting.FogEnd
+    end
+end)
+-- 2.../
+
+
+CreateSection("⚙️ System")
+
+-- 1...\
+CreateToggle("Anti-AFK", "Prevents 20-minute idle kick.", true, function(state)
+    if state then
+        AntiAfkConnection = Player.Idled:Connect(function()
+            VirtualUser:CaptureController()
+            VirtualUser:ClickButton2(Vector2.new())
+        end)
+    else
+        if AntiAfkConnection then
+            AntiAfkConnection:Disconnect()
+            AntiAfkConnection = nil
+        end
+    end
+end)
+-- 1.../
 ]...
 
 TAB3 name=Main3

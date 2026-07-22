@@ -24,7 +24,7 @@ local function ApplyThemeStroke(parent, thickness, transparency)
 end
 
 -- ==========================================
--- SYSTEM: อ่านข้อมูลคีย์ให้ตรงกับหน้า Login (แบบใหม่)
+-- SYSTEM: อ่านข้อมูลคีย์ให้ตรงกับหน้า Login
 -- ==========================================
 local userType = "Unverified ❌" 
 local userCredits = 0
@@ -34,7 +34,6 @@ local isPermanent = false
 local FOLDER_NAME = "Pomelo_System"
 local FILE_NAME = FOLDER_NAME .. "/SysData.cfg"
 
--- ดึงฐานข้อมูล Keyword สำหรับถอดรหัส
 local KEYWORD_URL = "https://raw.githubusercontent.com/bilibil31-lime/ilikepomelo555tyGGbyeJJK10101/main/Modules/mod_keyword.lua"
 local KeywordMap = {}
 local ReverseMap = {}
@@ -54,13 +53,11 @@ if successFetch and responseFetch then
     table.sort(SortedCodes, function(a, b) return #a > #b end)
 end
 
--- ฟังก์ชันถอดรหัสข้อมูลแบบใหม่ (รองรับระบบ Keyword)
 local function DecodeData(dataStr)
     local encodedStr = string.match(dataStr, "POMELO_SECURE_V1\n([^\n]+)\nEOF")
     if not encodedStr then return nil end
     
     local rawData = encodedStr
-    -- แปลงรหัสกลับเป็นอักษรเดิม ตามลำดับความยาว
     for _, code in ipairs(SortedCodes) do
         local safeCode = code:gsub("[%-%^%$%(%)%%%.%[%]%*%+%?]", "%%%0")
         rawData = rawData:gsub(safeCode, ReverseMap[code])
@@ -80,7 +77,6 @@ local function CheckUserStatus()
                 expireTime = data.expire
                 userCredits = data.credits
                 
-                -- เช็คประเภทและตั้งค่าให้ตรง
                 if data.type == "admin" then
                     userType = "Admin 👑"
                     isPermanent = true
@@ -100,7 +96,9 @@ local function CheckUserStatus()
 end
 pcall(CheckUserStatus)
 
--- เช็คอุปกรณ์ที่เล่น
+-- ==========================================
+-- SYSTEM: เช็คอุปกรณ์ที่เล่น
+-- ==========================================
 local deviceType = "Unknown ❓"
 if UIS.KeyboardEnabled and UIS.MouseEnabled then
     deviceType = "PC 💻"
@@ -110,8 +108,32 @@ elseif UIS.GamepadEnabled then
     deviceType = "Console 🎮"
 end
 
+-- ==========================================
+-- SYSTEM: เช็คตัวรัน (Executor Detection)
+-- ==========================================
+local executorName = "Unknown ❓"
+local function GetExecutorName()
+    local success, name = pcall(function()
+        if identifyexecutor then return identifyexecutor() end
+        local env = getgenv and getgenv() or _G
+        if env.KRNL_LOADED then return "Krnl" end
+        if env.syn then return "Synapse X" end
+        if env.fluxus then return "Fluxus" end
+        if getexecutorname then return getexecutorname() end
+        return "Unknown"
+    end)
+    if success and type(name) == "string" and name ~= "" then
+        return name
+    end
+    return "Unknown ❓"
+end
+executorName = GetExecutorName()
+
+-- ==========================================
+-- UI: สร้างหน้าต่าง
+-- ==========================================
 local ProfileCard = Instance.new("Frame", TabContainer)
-ProfileCard.Size = UDim2.new(1, -20, 0, 130) 
+ProfileCard.Size = UDim2.new(1, -20, 0, 150) -- ปรับความสูงเพิ่มนิดหน่อยเผื่อรองรับ Badge ที่ 5
 ProfileCard.Position = UDim2.new(0, 10, 0, 15)
 ProfileCard.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
 ProfileCard.BackgroundTransparency = 0.5 
@@ -200,11 +222,11 @@ local function CreateStatBadge(text)
     return Lbl
 end
 
--- แก้ไขให้แสดงตัวเลขเครดิตแบบตรงไปตรงมา ไม่เปลี่ยนเป็นคำว่า Unlimited แล้ว
 local TimeLeftLabel = CreateStatBadge("⏳ Time Left: <b>Calculating...</b>")
 local StatusLabel = CreateStatBadge("⭐ Status: <b>" .. userType .. "</b>")
 local CreditsLabel = CreateStatBadge("💎 Credits: <b>" .. tostring(userCredits) .. "</b>")
 CreateStatBadge("🎮 Device: <b>" .. deviceType .. "</b>")
+CreateStatBadge("🚀 Executor: <b>" .. executorName .. "</b>") -- เพิ่มบรรทัดบอกตัวรันตรงนี้
 
 -- ==========================================
 -- UPDATE: ระบบ Loop คำนวณเวลานับถอยหลัง
@@ -213,13 +235,11 @@ task.spawn(function()
     while task.wait(1) do
         if not TimeLeftLabel or not TimeLeftLabel.Parent then break end
         
-        -- ถ้ายอด expireTime เป็น 0 หรือไม่มีคีย์ ให้ขึ้น No Key
         if expireTime == 0 or userType == "Unverified ❌" then
             TimeLeftLabel.Text = "⏳ Time Left: <b>No Key ❌</b>"
         elseif isPermanent then
             TimeLeftLabel.Text = "⏳ Time Left: <b>Lifetime ♾️</b>"
         else
-            -- ระบบนับเวลาถอยหลังแบบเรียลไทม์
             local diff = expireTime - os.time()
             
             if diff <= 0 then
@@ -230,7 +250,6 @@ task.spawn(function()
                 local minutes = math.floor((diff % 3600) / 60)
                 local seconds = diff % 60
                 
-                -- อัปเดตข้อความเรื่อยๆ ตามวินาทีที่เดิน
                 if days > 0 then
                     TimeLeftLabel.Text = string.format("⏳ Time Left: <b>%dd %02dh %02dm %02ds</b>", days, hours, minutes, seconds)
                 else
@@ -242,8 +261,8 @@ task.spawn(function()
 end)
 
 local FooterContainer = Instance.new("ScrollingFrame", TabContainer)
-FooterContainer.Size = UDim2.new(1, -20, 1, -165)
-FooterContainer.Position = UDim2.new(0, 10, 0, 155)
+FooterContainer.Size = UDim2.new(1, -20, 1, -185) -- ขยับเผื่อ ProfileCard ที่สูงขึ้น
+FooterContainer.Position = UDim2.new(0, 10, 0, 175)
 FooterContainer.BackgroundTransparency = 1
 FooterContainer.BorderSizePixel = 0
 FooterContainer.ScrollBarThickness = 3 
@@ -275,26 +294,24 @@ BottomText.RichText = true
 BottomText.TextWrapped = true 
 BottomText.AutomaticSize = Enum.AutomaticSize.Y 
 
-BottomText.Text = [[
-<font size='16' color='rgb(255,180,220)'><b>💎 ACCOUNT & PRIVILEGES 💎</b></font>
-<font size='11' color='rgb(200,200,200)'><i>"Live sync with Pomelo Security Protocols"</i></font>
+-- ==========================================
+-- UPDATE: ดึงข้อความจาก Github (Live Message)
+-- ==========================================
+local LIVE_MESSAGE_URL = "https://raw.githubusercontent.com/bilibil31-lime/ilikepomelo555tyGGbyeJJK10101/main/Modules/mod_message123.lua"
 
-<font color='rgb(255,100,180)'><b>🔹 User Access Status</b></font>
-• <b>Normal User:</b> Standard tier obtained via the free public key generation system. Grants full access to baseline features for a temporary duration of 24 hours per session.
-• <b>Friend / Admin:</b> Premium whitelisted status granting permanent lifetime privileges, absolute bypass authority, and exclusive access to advanced core functions.
+BottomText.Text = "<i>Loading live data from server...</i>"
 
-<font color='rgb(255,100,180)'><b>🔹 Key Expiration & Time Left</b></font>
-• Displays a real-time countdown monitoring your active session authorization. Once this timer reaches zero, the current key expires, requiring a new key generation through the official link to restore full utility.
-
-<font color='rgb(255,100,180)'><b>🔹 Execution Credits</b></font>
-• <b>Normal User:</b> Displays the remaining session credits allocated to your profile. Credits are dynamically updated upon new key validation to balance server load and maintain network integrity against automated spamming.
-• <b>Friend / Admin:</b> Fully unrestricted and unlimited usage with zero execution barriers or credit enforcement rules.
-
-<font color='rgb(255,100,180)'><b>🔹 Hardware Optimization</b></font>
-• Intelligent cross-platform environment detection (PC, Mobile, or Console) engineered to automatically calibrate script parameters, maximize frame rates, and ensure ultimate runtime stability.
-
-<font color='rgb(255,150,150)'><i>💖 Secure, Reliable, and Engineered for Excellence 💖</i></font>
-]]
+task.spawn(function()
+    local success, response = pcall(function()
+        return game:HttpGet(LIVE_MESSAGE_URL)
+    end)
+    
+    if success and response and response ~= "" then
+        BottomText.Text = response
+    else
+        BottomText.Text = "<font color='rgb(255,100,100)'>[ERROR] Failed to fetch live message from server.</font>"
+    end
+end)
 ]...
 TAB2 name=Setting
 [...

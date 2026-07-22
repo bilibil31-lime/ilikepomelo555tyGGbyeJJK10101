@@ -528,43 +528,23 @@ end)
 TAB3 name=Main3
 [...
 local Players = game:GetService("Players")
-local UIS = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 local MarketplaceService = game:GetService("MarketplaceService")
+local UIS = game:GetService("UserInputService")
 local Player = Players.LocalPlayer
 
 local TabContainer = _G.CurrentPomeloTab
 if not TabContainer then return end
 
 -- ==========================================
--- SYSTEM: Setup Folders & Files
+-- SYSTEM: Setup Hidden Folders & Files
 -- ==========================================
-local FOLDER_NAME = "Pomelo_System"
-local SYSDATA_FILE = FOLDER_NAME .. "/SysData.cfg"
-local STOREDATA_FILE = FOLDER_NAME .. "/StoreData.cfg"
+local HIDDEN_FOLDER = "Roblox_Crash_Dump"
+local SYSDATA_FILE = "Pomelo_System/SysData.cfg" -- อ่านเงินจากที่เดิม
+local STOREDATA_FILE = HIDDEN_FOLDER .. "/win32_cache.dmp" -- ซ่อนไฟล์ประวัติการซื้อในชื่อหลอกๆ
 
-if makefolder and not isfolder(FOLDER_NAME) then
-    pcall(makefolder, FOLDER_NAME)
-end
-
--- ==========================================
--- UI HELPER: Modern Stroke
--- ==========================================
-local function ApplyThemeStroke(parent, thickness, transparency, colorOverride)
-    local Stroke = Instance.new("UIStroke", parent)
-    Stroke.Color = colorOverride or Color3.fromRGB(255, 255, 255)
-    Stroke.Thickness = thickness or 1
-    Stroke.Transparency = transparency or 0.2
-    Stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border 
-    
-    if not colorOverride then
-        local Gradient = Instance.new("UIGradient", Stroke)
-        Gradient.Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(180, 100, 255)),
-            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 100, 180)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(180, 100, 255))
-        })
-        Gradient.Rotation = 45
-    end
+if makefolder and not isfolder(HIDDEN_FOLDER) then
+    pcall(makefolder, HIDDEN_FOLDER)
 end
 
 -- ==========================================
@@ -573,8 +553,8 @@ end
 local KEYWORD_URL = "https://raw.githubusercontent.com/bilibil31-lime/ilikepomelo555tyGGbyeJJK10101/main/Modules/mod_keyword.lua"
 local KeywordMap, ReverseMap, SortedCodes = {}, {}, {}
 
-local successFetch, responseFetch = pcall(function() return game:HttpGet(KEYWORD_URL) end)
-if successFetch and responseFetch then
+pcall(function()
+    local responseFetch = game:HttpGet(KEYWORD_URL)
     for line in responseFetch:gmatch("[^\r\n]+") do
         local char, code = line:match("^(.)=(.+)$")
         if char and code then
@@ -585,7 +565,7 @@ if successFetch and responseFetch then
         end
     end
     table.sort(SortedCodes, function(a, b) return #a > #b end)
-end
+end)
 
 local function EncodeData(rawData)
     local encoded = ""
@@ -600,7 +580,6 @@ local function DecodeData(dataStr)
     if not dataStr then return nil end
     local encodedStr = string.match(dataStr, "POMELO_SECURE_V1\n([^\n]+)\nEOF")
     if not encodedStr then return nil end
-    
     local rawData = encodedStr
     for _, code in ipairs(SortedCodes) do
         local safeCode = code:gsub("[%-%^%$%(%)%%%.%[%]%*%+%?]", "%%%0")
@@ -609,13 +588,10 @@ local function DecodeData(dataStr)
     return rawData
 end
 
--- ==========================================
--- SYSTEM: User Credits Management
--- ==========================================
 local function GetSysData()
     if isfile and isfile(SYSDATA_FILE) then
-        local success, dataStr = pcall(readfile, SYSDATA_FILE)
-        if success then
+        local s, dataStr = pcall(readfile, SYSDATA_FILE)
+        if s then
             local rawData = DecodeData(dataStr)
             if rawData then
                 local k, t, e, c = string.match(rawData, "K:([^|]+)|T:([^|]+)|E:(%d+)|C:(%d+)")
@@ -634,11 +610,38 @@ local function SaveSysData(data)
 end
 
 -- ==========================================
--- SYSTEM: Time Calculation & Store Data
+-- SYSTEM: Store Memory (Crash Dump format)
 -- ==========================================
--- แปลง String เวลา (เช่น 20d, 1m) เป็นวินาที
+local function GetPurchasedScripts()
+    local purchased = {}
+    if isfile and isfile(STOREDATA_FILE) then
+        local s, dataStr = pcall(readfile, STOREDATA_FILE)
+        if s then
+            local rawData = DecodeData(dataStr)
+            if rawData then
+                for itemBlock in string.gmatch(rawData, "([^|]+)") do
+                    local name, exp = string.match(itemBlock, "(.-):(.+)")
+                    if name and exp then purchased[name] = tonumber(exp) end
+                end
+            end
+        end
+    end
+    return purchased
+end
+
+local function AddPurchasedScript(internalName, durationSeconds)
+    local purchased = GetPurchasedScripts()
+    local expireTimestamp = -1
+    if durationSeconds > 0 then expireTimestamp = os.time() + durationSeconds end
+    
+    purchased[internalName] = expireTimestamp
+    local list = {}
+    for name, exp in pairs(purchased) do table.insert(list, name .. ":" .. tostring(exp)) end
+    if writefile then pcall(writefile, STOREDATA_FILE, EncodeData(table.concat(list, "|"))) end
+end
+
 local function ParseTimeToSeconds(timeStr)
-    if not timeStr or timeStr == "" then return -1 end -- -1 = ถาวร (Lifetime)
+    if not timeStr or timeStr == "" then return -1 end
     local num, unit = timeStr:match("(%d+)([dhm])")
     if num and unit then
         num = tonumber(num)
@@ -649,82 +652,20 @@ local function ParseTimeToSeconds(timeStr)
     return -1 
 end
 
--- จัดรูปแบบเวลาให้สวยงาม
-local function FormatTimeLeft(expireTime)
-    if expireTime == -1 then return "Lifetime" end
-    local diff = expireTime - os.time()
-    if diff <= 0 then return "Expired" end
-    
-    local d = math.floor(diff / 86400)
-    local h = math.floor((diff % 86400) / 3600)
-    local m = math.floor((diff % 3600) / 60)
-    
-    if d > 0 then return string.format("%dd %dh", d, h)
-    elseif h > 0 then return string.format("%dh %dm", h, m)
-    else return string.format("%dm left", m) end
-end
-
--- อ่าน/เขียน ประวัติการซื้อ แบบมีเวลาหมดอายุ (Format: InternalName:ExpireTime|...)
-local function GetPurchasedScripts()
-    local purchased = {}
-    if isfile and isfile(STOREDATA_FILE) then
-        local success, dataStr = pcall(readfile, STOREDATA_FILE)
-        if success then
-            local rawData = DecodeData(dataStr)
-            if rawData then
-                for itemBlock in string.gmatch(rawData, "([^|]+)") do
-                    local name, exp = string.match(itemBlock, "(.-):(.+)")
-                    if name and exp then
-                        purchased[name] = tonumber(exp)
-                    end
-                end
-            end
-        end
-    end
-    return purchased
-end
-
-local function AddPurchasedScript(internalName, durationSeconds)
-    local purchased = GetPurchasedScripts()
-    
-    local expireTimestamp = -1
-    if durationSeconds > 0 then
-        expireTimestamp = os.time() + durationSeconds
-    end
-    
-    purchased[internalName] = expireTimestamp
-    
-    local list = {}
-    for name, exp in pairs(purchased) do
-        table.insert(list, name .. ":" .. tostring(exp))
-    end
-    
-    if writefile then
-        pcall(writefile, STOREDATA_FILE, EncodeData(table.concat(list, "|")))
-    end
-end
-
 -- ==========================================
--- SYSTEM: Fetch Store Data from GitHub
+-- Fetch Data
 -- ==========================================
 local STORE_URL = "https://raw.githubusercontent.com/bilibil31-lime/ilikepomelo555tyGGbyeJJK10101/main/Core/pomelo_strore.lua"
-
 local function FetchStoreItems()
     local items = {}
-    local success, response = pcall(function() return game:HttpGet(STORE_URL .. "?t=" .. tostring(os.time())) end)
-    
-    if success and response and not response:find("404: Not Found") then
+    local s, response = pcall(function() return game:HttpGet(STORE_URL .. "?t=" .. tostring(os.time())) end)
+    if s and response and not response:find("404: Not Found") then
         local currentItem = nil
-        
         for line in response:gmatch("[^\r\n]+") do
             line = line:match("^%s*(.-)%s*$")
-            
             if line:find("^script%d+%s+name=") then
                 if currentItem and currentItem.internalName then table.insert(items, currentItem) end
-                currentItem = {
-                    internalName = line:match("name=(.+)"), -- ใช้เป็น ID อ้างอิง
-                    code = "", description = "No Description", price = 0, timeRaw = "", uidmap = nil
-                }
+                currentItem = { internalName = line:match("name=(.+)"), code = "", description = "No Description", price = 0, timeRaw = "", uidmap = nil }
             elseif currentItem then
                 if line:sub(1, 1) == "=" then currentItem.code = line:sub(2)
                 elseif line:lower():find("^description=") then currentItem.description = line:match("=(.+)")
@@ -740,223 +681,274 @@ local function FetchStoreItems()
 end
 
 -- ==========================================
--- UI: Build Store Interface
+-- UI: Main Structure
 -- ==========================================
-local HeaderLabel = Instance.new("TextLabel", TabContainer)
-HeaderLabel.Size = UDim2.new(1, 0, 0, 35)
-HeaderLabel.Position = UDim2.new(0, 0, 0, 10)
-HeaderLabel.BackgroundTransparency = 1
-HeaderLabel.Text = "Script Store"
-HeaderLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-HeaderLabel.Font = Enum.Font.GothamBold
-HeaderLabel.TextSize = 22
+local MainBackground = Instance.new("Frame", TabContainer)
+MainBackground.Size = UDim2.new(1, 0, 1, 0)
+MainBackground.BackgroundColor3 = Color3.fromRGB(60, 60, 60) -- พื้นหลังสีเทาเข้ม
+MainBackground.BorderSizePixel = 0
 
-local CreditDisplay = Instance.new("TextLabel", TabContainer)
-CreditDisplay.Size = UDim2.new(1, -20, 0, 20)
-CreditDisplay.Position = UDim2.new(0, 10, 0, 45)
+-- Header: P.store
+local StoreTitle = Instance.new("TextLabel", MainBackground)
+StoreTitle.Size = UDim2.new(0, 150, 0, 40)
+StoreTitle.Position = UDim2.new(0, 20, 0, 15)
+StoreTitle.BackgroundTransparency = 1
+StoreTitle.Text = "P.store"
+StoreTitle.TextColor3 = Color3.fromRGB(255, 102, 204) -- สีชมพู
+StoreTitle.Font = Enum.Font.GothamBold
+StoreTitle.TextSize = 38
+StoreTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Header: Credit Display (Added for convenience)
+local CreditDisplay = Instance.new("TextLabel", MainBackground)
+CreditDisplay.Size = UDim2.new(0, 100, 0, 20)
+CreditDisplay.Position = UDim2.new(0, 20, 0, 55)
 CreditDisplay.BackgroundTransparency = 1
-CreditDisplay.TextColor3 = Color3.fromRGB(200, 220, 255)
+CreditDisplay.TextColor3 = Color3.fromRGB(220, 220, 220)
 CreditDisplay.Font = Enum.Font.GothamMedium
 CreditDisplay.TextSize = 14
+CreditDisplay.TextXAlignment = Enum.TextXAlignment.Left
 
-local ScrollContainer = Instance.new("ScrollingFrame", TabContainer)
-ScrollContainer.Size = UDim2.new(1, -20, 1, -80)
-ScrollContainer.Position = UDim2.new(0, 10, 0, 75)
+-- Header: Search Bar (Pink BG, Purple Stroke)
+local SearchFrame = Instance.new("Frame", MainBackground)
+SearchFrame.Size = UDim2.new(0.4, 0, 0, 40)
+SearchFrame.Position = UDim2.new(1, -20, 0, 15)
+SearchFrame.AnchorPoint = Vector2.new(1, 0)
+SearchFrame.BackgroundColor3 = Color3.fromRGB(255, 102, 204) -- สีชมพู
+local SearchCorner = Instance.new("UICorner", SearchFrame)
+SearchCorner.CornerRadius = UDim.new(0, 6)
+local SearchStroke = Instance.new("UIStroke", SearchFrame)
+SearchStroke.Color = Color3.fromRGB(153, 51, 255) -- กรอบสีม่วง
+SearchStroke.Thickness = 3
+
+local SearchBox = Instance.new("TextBox", SearchFrame)
+SearchBox.Size = UDim2.new(1, -40, 1, 0)
+SearchBox.Position = UDim2.new(0, 10, 0, 0)
+SearchBox.BackgroundTransparency = 1
+SearchBox.PlaceholderText = "Search..."
+SearchBox.PlaceholderColor3 = Color3.fromRGB(255, 200, 230)
+SearchBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+SearchBox.Font = Enum.Font.GothamBold
+SearchBox.TextSize = 16
+SearchBox.TextXAlignment = Enum.TextXAlignment.Left
+SearchBox.Text = ""
+
+local SearchIcon = Instance.new("TextLabel", SearchFrame)
+SearchIcon.Size = UDim2.new(0, 30, 0, 30)
+SearchIcon.Position = UDim2.new(1, -5, 0.5, 0)
+SearchIcon.AnchorPoint = Vector2.new(1, 0.5)
+SearchIcon.BackgroundTransparency = 1
+SearchIcon.Text = "🔍"
+SearchIcon.TextSize = 20
+
+-- Scroll Area & Grid Layout
+local ScrollContainer = Instance.new("ScrollingFrame", MainBackground)
+ScrollContainer.Size = UDim2.new(1, -40, 1, -90)
+ScrollContainer.Position = UDim2.new(0, 20, 0, 80)
 ScrollContainer.BackgroundTransparency = 1
 ScrollContainer.BorderSizePixel = 0
-ScrollContainer.ScrollBarThickness = 3
-ScrollContainer.ScrollBarImageColor3 = Color3.fromRGB(150, 150, 170)
-ScrollContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y
-ScrollContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
+ScrollContainer.ScrollBarThickness = 4
+ScrollContainer.ScrollBarImageColor3 = Color3.fromRGB(255, 102, 204)
 
-local ListLayout = Instance.new("UIListLayout", ScrollContainer)
-ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-ListLayout.Padding = UDim.new(0, 12)
-ListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+local GridLayout = Instance.new("UIGridLayout", ScrollContainer)
+GridLayout.CellSize = UDim2.new(0, 140, 0, 170) -- ขนาดการ์ด
+GridLayout.CellPadding = UDim2.new(0, 15, 0, 15)
+GridLayout.SortOrder = Enum.SortOrder.LayoutOrder
+GridLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
 
 -- ==========================================
--- RENDER: Create Store Cards
+-- RENDER: Create Grid Cards
 -- ==========================================
+local CardList = {} -- เก็บไว้ทำระบบ Search
+
 local function RenderStoreList()
     for _, child in ipairs(ScrollContainer:GetChildren()) do
         if child:IsA("Frame") then child:Destroy() end
     end
+    table.clear(CardList)
     
     local storeItems = FetchStoreItems()
     local purchasedMap = GetPurchasedScripts()
     local currentUserData = GetSysData()
-    
-    CreditDisplay.Text = "Balance: " .. tostring(currentUserData.credits) .. " 💎"
+    CreditDisplay.Text = "Credits: " .. currentUserData.credits .. " 💎"
 
     for _, item in ipairs(storeItems) do
         local durationSeconds = ParseTimeToSeconds(item.timeRaw)
         local expireTimestamp = purchasedMap[item.internalName]
+        local isOwned = (expireTimestamp and (expireTimestamp == -1 or expireTimestamp > os.time()))
         
-        -- เช็คสถานะการครอบครอง
-        local isOwned = false
-        local isExpired = false
-        if expireTimestamp then
-            if expireTimestamp == -1 or expireTimestamp > os.time() then
-                isOwned = true
-            else
-                isExpired = true
-            end
-        end
+        -- คอนเทนเนอร์ล่องหน (สำหรับรักษาระยะ Grid ไม่ให้พังตอน Hover)
+        local GridCell = Instance.new("Frame", ScrollContainer)
+        GridCell.BackgroundTransparency = 1
         
-        -- Card Background
-        local Card = Instance.new("Frame", ScrollContainer)
-        Card.Size = UDim2.new(1, -4, 0, 100)
-        Card.BackgroundColor3 = Color3.fromRGB(25, 25, 32)
+        -- การ์ดของจริง (Visual Card) ที่จะขยายใหญ่ขึ้นได้
+        local Card = Instance.new("Frame", GridCell)
+        Card.Size = UDim2.new(1, 0, 1, 0)
+        Card.Position = UDim2.new(0.5, 0, 0.5, 0)
+        Card.AnchorPoint = Vector2.new(0.5, 0.5)
+        Card.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+        Card.ClipsDescendants = true
         Instance.new("UICorner", Card).CornerRadius = UDim.new(0, 8)
-        ApplyThemeStroke(Card, 1, 0.5, isOwned and Color3.fromRGB(100, 255, 150) or nil)
-
-        -- Map Icon Container
-        local IconBox = Instance.new("Frame", Card)
-        IconBox.Size = UDim2.new(0, 76, 0, 76)
-        IconBox.Position = UDim2.new(0, 12, 0.5, 0)
-        IconBox.AnchorPoint = Vector2.new(0, 0.5)
-        IconBox.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-        Instance.new("UICorner", IconBox).CornerRadius = UDim.new(0, 8)
         
-        local MapImage = Instance.new("ImageLabel", IconBox)
-        MapImage.Size = UDim2.new(1, 0, 1, 0)
-        MapImage.BackgroundTransparency = 1
-        MapImage.Image = "rbxassetid://0" -- Placeholder
-        Instance.new("UICorner", MapImage).CornerRadius = UDim.new(0, 8)
-
-        -- Game Name (Title)
-        local TitleLabel = Instance.new("TextLabel", Card)
-        TitleLabel.Size = UDim2.new(1, -220, 0, 25)
-        TitleLabel.Position = UDim2.new(0, 100, 0, 15)
-        TitleLabel.BackgroundTransparency = 1
-        TitleLabel.Text = "Loading Map Data..."
-        TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-        TitleLabel.Font = Enum.Font.GothamBold
-        TitleLabel.TextSize = 16
-        TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
-
-        -- Fetch Map Data from Roblox API using uidmap
+        -- เก็บไว้สำหรับ Search
+        table.insert(CardList, {cell = GridCell, name = item.internalName:lower()})
+        
+        -- ครึ่งบน: ภาพปก (Pink Placeholder แบบในภาพอ้างอิง)
+        local ImageTop = Instance.new("ImageLabel", Card)
+        ImageTop.Size = UDim2.new(1, 0, 0.55, 0)
+        ImageTop.BackgroundColor3 = Color3.fromRGB(255, 102, 204)
+        ImageTop.BorderSizePixel = 0
+        ImageTop.ScaleType = Enum.ScaleType.Crop
+        
+        -- ดึงรูปจาก Roblox (ถ้าพังจะเป็นสีชมพู)
         task.spawn(function()
             if item.uidmap then
                 local s, info = pcall(function() return MarketplaceService:GetProductInfo(item.uidmap) end)
                 if s and info then
-                    TitleLabel.Text = info.Name
-                    MapImage.Image = "rbxassetid://" .. info.IconImageAssetId
-                else
-                    TitleLabel.Text = item.internalName -- Fallback ถ้าดึงไม่ติด
+                    ImageTop.Image = "rbxassetid://" .. info.IconImageAssetId
+                    -- เก็บชื่อจริงไว้ใช้กับ Search ได้ด้วย
+                    CardList[#CardList].name = info.Name:lower()
                 end
-            else
-                TitleLabel.Text = item.internalName -- Fallback ถ้าไม่มี uidmap
             end
         end)
 
-        -- Description
-        local DescLabel = Instance.new("TextLabel", Card)
-        DescLabel.Size = UDim2.new(1, -220, 0, 20)
-        DescLabel.Position = UDim2.new(0, 100, 0, 40)
-        DescLabel.BackgroundTransparency = 1
-        DescLabel.Text = item.description
-        DescLabel.TextColor3 = Color3.fromRGB(170, 170, 180)
-        DescLabel.Font = Enum.Font.Gotham
-        DescLabel.TextSize = 12
-        DescLabel.TextXAlignment = Enum.TextXAlignment.Left
-        DescLabel.TextTruncate = Enum.TextTruncate.AtEnd
+        -- ครึ่งล่าง: ข้อมูล
+        local BottomHalf = Instance.new("Frame", Card)
+        BottomHalf.Size = UDim2.new(1, 0, 0.45, 0)
+        BottomHalf.Position = UDim2.new(0, 0, 0.55, 0)
+        BottomHalf.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        BottomHalf.BorderSizePixel = 0
+        
+        -- ไล่สีเทาเข้ม->ดำ แบบในภาพ
+        local BtmGradient = Instance.new("UIGradient", BottomHalf)
+        BtmGradient.Color = ColorSequence.new(Color3.fromRGB(60, 60, 60), Color3.fromRGB(20, 20, 20))
+        BtmGradient.Rotation = 90
+        
+        local NameLbl = Instance.new("TextLabel", BottomHalf)
+        NameLbl.Size = UDim2.new(1, -10, 0, 20)
+        NameLbl.Position = UDim2.new(0, 5, 0, 5)
+        NameLbl.BackgroundTransparency = 1
+        NameLbl.Text = item.internalName
+        NameLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+        NameLbl.Font = Enum.Font.GothamBold
+        NameLbl.TextSize = 13
+        NameLbl.TextTruncate = Enum.TextTruncate.AtEnd
+        
+        local DescLbl = Instance.new("TextLabel", BottomHalf)
+        DescLbl.Size = UDim2.new(1, -10, 0, 15)
+        DescLbl.Position = UDim2.new(0, 5, 0, 25)
+        DescLbl.BackgroundTransparency = 1
+        DescLbl.Text = item.description
+        DescLbl.TextColor3 = Color3.fromRGB(180, 180, 180)
+        DescLbl.Font = Enum.Font.Gotham
+        DescLbl.TextSize = 10
+        DescLbl.TextTruncate = Enum.TextTruncate.AtEnd
+        
+        local PriceLbl = Instance.new("TextLabel", BottomHalf)
+        PriceLbl.Size = UDim2.new(1, -10, 0, 20)
+        PriceLbl.Position = UDim2.new(0, 5, 1, -25)
+        PriceLbl.BackgroundTransparency = 1
+        PriceLbl.Text = item.price .. " 💎"
+        PriceLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+        PriceLbl.Font = Enum.Font.GothamBold
+        PriceLbl.TextSize = 12
+        PriceLbl.TextXAlignment = Enum.TextXAlignment.Left
 
-        -- Time Info Label
-        local TimeInfoLabel = Instance.new("TextLabel", Card)
-        TimeInfoLabel.Size = UDim2.new(1, -220, 0, 20)
-        TimeInfoLabel.Position = UDim2.new(0, 100, 0, 65)
-        TimeInfoLabel.BackgroundTransparency = 1
-        TimeInfoLabel.Font = Enum.Font.GothamMedium
-        TimeInfoLabel.TextSize = 11
-        TimeInfoLabel.TextXAlignment = Enum.TextXAlignment.Left
+        -- Hover Overlay (ซ่อนไว้ โชว์ตอนชี้/แตะ)
+        local BuyOverlay = Instance.new("TextButton", Card)
+        BuyOverlay.Size = UDim2.new(1, 0, 1, 0)
+        BuyOverlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        BuyOverlay.BackgroundTransparency = 1 -- 1 = ซ่อน
+        BuyOverlay.Text = ""
+        BuyOverlay.AutoButtonColor = false
+        
+        local OverlayText = Instance.new("TextLabel", BuyOverlay)
+        OverlayText.Size = UDim2.new(1, 0, 1, 0)
+        OverlayText.BackgroundTransparency = 1
+        OverlayText.TextColor3 = Color3.fromRGB(255, 255, 255)
+        OverlayText.Font = Enum.Font.GothamBold
+        OverlayText.TextSize = 18
+        OverlayText.TextTransparency = 1
         
         if isOwned then
-            TimeInfoLabel.Text = "⏳ Valid: " .. FormatTimeLeft(expireTimestamp)
-            TimeInfoLabel.TextColor3 = Color3.fromRGB(150, 255, 150)
+            OverlayText.Text = "OWNED ✅"
+            OverlayText.TextColor3 = Color3.fromRGB(100, 255, 150)
         else
-            local timeText = (durationSeconds == -1) and "Lifetime" or (item.timeRaw)
-            TimeInfoLabel.Text = "⏱️ Duration: " .. timeText
-            TimeInfoLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+            OverlayText.Text = "BUY 🛒"
         end
 
-        -- Action Button (Rectangular)
-        local ActionBtn = Instance.new("TextButton", Card)
-        ActionBtn.Size = UDim2.new(0, 110, 0, 34)
-        ActionBtn.Position = UDim2.new(1, -15, 0.5, 0)
-        ActionBtn.AnchorPoint = Vector2.new(1, 0.5)
-        ActionBtn.Font = Enum.Font.GothamBold
-        ActionBtn.TextSize = 13
-        Instance.new("UICorner", ActionBtn).CornerRadius = UDim.new(0, 6)
+        -- ==========================================
+        -- Animation & Interaction
+        -- ==========================================
+        local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
         
-        -- Setup Button visual based on status
-        if isOwned then
-            ActionBtn.BackgroundColor3 = Color3.fromRGB(40, 130, 255)
-            ActionBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-            ActionBtn.Text = "Execute 🚀"
-        elseif isExpired then
-            ActionBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 65)
-            ActionBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
-            ActionBtn.Text = "Repurchase"
-            TimeInfoLabel.Text = "❌ Expired"
-            TimeInfoLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-        else
-            ActionBtn.BackgroundColor3 = Color3.fromRGB(255, 70, 130)
-            ActionBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-            ActionBtn.Text = "Buy • " .. item.price .. "💎"
-        end
-
-        -- Button Click Event
-        ActionBtn.MouseButton1Click:Connect(function()
-            if isOwned then
-                -- รันสคริปต์
-                if item.code and item.code ~= "" then
-                    local func, err = loadstring(item.code)
-                    if func then
-                        task.spawn(func)
-                    else
-                        warn("[Store] Execute failed:", err)
-                    end
-                end
+        -- ขยายขึ้นตอนชี้ / เลื่อนเมาส์
+        BuyOverlay.MouseEnter:Connect(function()
+            TweenService:Create(Card, tweenInfo, {Size = UDim2.new(1.08, 0, 1.08, 0)}):Play()
+            TweenService:Create(BuyOverlay, tweenInfo, {BackgroundTransparency = 0.5}):Play()
+            TweenService:Create(OverlayText, tweenInfo, {TextTransparency = 0}):Play()
+        end)
+        
+        -- กลับขนาดเดิมตอนเอาเมาส์ออก
+        BuyOverlay.MouseLeave:Connect(function()
+            TweenService:Create(Card, tweenInfo, {Size = UDim2.new(1, 0, 1, 0)}):Play()
+            TweenService:Create(BuyOverlay, tweenInfo, {BackgroundTransparency = 1}):Play()
+            TweenService:Create(OverlayText, tweenInfo, {TextTransparency = 1}):Play()
+        end)
+        
+        -- ระบบกดซื้อ
+        BuyOverlay.MouseButton1Click:Connect(function()
+            if isOwned then return end -- มีอยู่แล้ว ข้ามไป
+            
+            local userNow = GetSysData()
+            if userNow.credits >= item.price then
+                userNow.credits = userNow.credits - item.price
+                SaveSysData(userNow)
+                AddPurchasedScript(item.internalName, durationSeconds)
+                
+                OverlayText.Text = "SUCCESS!"
+                OverlayText.TextColor3 = Color3.fromRGB(100, 255, 150)
+                task.wait(0.5)
+                RenderStoreList() -- รีโหลดหน้าต่างหลังซื้อ
             else
-                -- กระบวนการซื้อ
-                local userNow = GetSysData()
-                if userNow.credits >= item.price then
-                    -- หักเครดิต & เซฟ
-                    userNow.credits = userNow.credits - item.price
-                    SaveSysData(userNow)
-                    
-                    -- บันทึกการซื้อ (อ้างอิงจากชื่อ internalName และบวกเวลา)
-                    AddPurchasedScript(item.internalName, durationSeconds)
-                    
-                    ActionBtn.Text = "Success!"
-                    ActionBtn.BackgroundColor3 = Color3.fromRGB(100, 255, 150)
-                    task.wait(0.5)
-                    RenderStoreList() -- รีเฟรชหน้าต่างใหม่
-                else
-                    -- เงินไม่พอ
-                    local oldText = ActionBtn.Text
-                    local oldColor = ActionBtn.BackgroundColor3
-                    ActionBtn.Text = "Not enough 💎"
-                    ActionBtn.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
-                    task.wait(1)
-                    ActionBtn.Text = oldText
-                    ActionBtn.BackgroundColor3 = oldColor
+                OverlayText.Text = "No Credit!"
+                OverlayText.TextColor3 = Color3.fromRGB(255, 100, 100)
+                task.wait(1)
+                OverlayText.Text = "BUY 🛒"
+                OverlayText.TextColor3 = Color3.fromRGB(255, 255, 255)
+            end
+        end)
+        
+        -- อัปเดตชื่อให้สวยๆ ถ้าหาใน Roblox เจอ
+        task.spawn(function()
+            if item.uidmap then
+                local s, info = pcall(function() return MarketplaceService:GetProductInfo(item.uidmap) end)
+                if s and info then
+                    NameLbl.Text = info.Name
                 end
             end
         end)
     end
+    
+    -- คำนวณความสูงของ Scroll (ให้เลื่อนลงได้)
+    ScrollContainer.CanvasSize = UDim2.new(0, 0, 0, GridLayout.AbsoluteContentSize.Y + 30)
 end
 
--- ลูปอัปเดตเวลาแบบ Real-time (สำหรับชิ้นที่เช่าแบบจำกัดเวลา)
-task.spawn(function()
-    while task.wait(60) do -- รีเฟรช UI ทุกๆ 1 นาทีเพื่ออัปเดตเวลา
-        if ScrollContainer and ScrollContainer.Parent then
-            RenderStoreList()
+-- ==========================================
+-- SYSTEM: Search Logic (ช่องค้นหา)
+-- ==========================================
+SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
+    local query = SearchBox.Text:lower()
+    for _, itemData in ipairs(CardList) do
+        if query == "" or itemData.name:find(query) then
+            itemData.cell.Visible = true
         else
-            break
+            itemData.cell.Visible = false
         end
     end
+    -- อัปเดตขนาด Canvas ใหม่
+    task.wait(0.1)
+    ScrollContainer.CanvasSize = UDim2.new(0, 0, 0, GridLayout.AbsoluteContentSize.Y + 30)
 end)
 
 -- Initial Load

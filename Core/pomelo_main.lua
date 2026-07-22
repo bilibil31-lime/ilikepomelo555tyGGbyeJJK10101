@@ -531,21 +531,46 @@ local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local MarketplaceService = game:GetService("MarketplaceService")
 local UIS = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 local Player = Players.LocalPlayer
 
 local TabContainer = _G.CurrentPomeloTab
 if not TabContainer then return end
 
 -- ==========================================
--- SYSTEM: Setup Hidden Folders & Files
+-- SYSTEM: Dual Folder Sync Setup
 -- ==========================================
-local HIDDEN_FOLDER = "Roblox_Crash_Dump"
-local SYSDATA_FILE = "Pomelo_System/SysData.cfg" -- อ่านเงินจากที่เดิม
-local STOREDATA_FILE = HIDDEN_FOLDER .. "/win32_cache.dmp" -- ซ่อนไฟล์ประวัติการซื้อในชื่อหลอกๆ
+local FOLDER_1 = "Pomelo_System"
+local FOLDER_2 = "Roblox_Crash_Dump"
 
-if makefolder and not isfolder(HIDDEN_FOLDER) then
-    pcall(makefolder, HIDDEN_FOLDER)
+local SYS_F1 = FOLDER_1 .. "/SysData.cfg"
+local SYS_F2 = FOLDER_2 .. "/SysData.cfg"
+local DUMP_F1 = FOLDER_1 .. "/win32_cache.dmp"
+local DUMP_F2 = FOLDER_2 .. "/win32_cache.dmp"
+
+-- สร้าง Folder ทั้ง 2
+if makefolder then
+    if not isfolder(FOLDER_1) then pcall(makefolder, FOLDER_1) end
+    if not isfolder(FOLDER_2) then pcall(makefolder, FOLDER_2) end
 end
+
+-- ฟังก์ชัน Sync ไฟล์ระหว่าง 2 โฟลเดอร์
+local function SyncMissingFile(pathA, pathB)
+    if isfile and readfile and writefile then
+        local hasA = isfile(pathA)
+        local hasB = isfile(pathB)
+        
+        if hasA and not hasB then
+            pcall(function() writefile(pathB, readfile(pathA)) end)
+        elseif hasB and not hasA then
+            pcall(function() writefile(pathA, readfile(pathB)) end)
+        end
+    end
+end
+
+-- ทำการ Sync ไฟล์ก่อนเริ่มทำงาน
+SyncMissingFile(SYS_F1, SYS_F2)
+SyncMissingFile(DUMP_F1, DUMP_F2)
 
 -- ==========================================
 -- SYSTEM: Encryption / Decryption
@@ -588,9 +613,15 @@ local function DecodeData(dataStr)
     return rawData
 end
 
+-- ==========================================
+-- SYSTEM: Data Management (Reads F1, Saves to BOTH)
+-- ==========================================
 local function GetSysData()
-    if isfile and isfile(SYSDATA_FILE) then
-        local s, dataStr = pcall(readfile, SYSDATA_FILE)
+    SyncMissingFile(SYS_F1, SYS_F2)
+    local targetFile = isfile(SYS_F1) and SYS_F1 or (isfile(SYS_F2) and SYS_F2 or nil)
+    
+    if targetFile then
+        local s, dataStr = pcall(readfile, targetFile)
         if s then
             local rawData = DecodeData(dataStr)
             if rawData then
@@ -606,16 +637,20 @@ end
 
 local function SaveSysData(data)
     local rawStr = string.format("K:%s|T:%s|E:%d|C:%d", data.key, data.type, data.expire, data.credits)
-    if writefile then pcall(writefile, SYSDATA_FILE, EncodeData(rawStr)) end
+    local encoded = EncodeData(rawStr)
+    if writefile then
+        pcall(writefile, SYS_F1, encoded)
+        pcall(writefile, SYS_F2, encoded)
+    end
 end
 
--- ==========================================
--- SYSTEM: Store Memory (Crash Dump format)
--- ==========================================
 local function GetPurchasedScripts()
+    SyncMissingFile(DUMP_F1, DUMP_F2)
     local purchased = {}
-    if isfile and isfile(STOREDATA_FILE) then
-        local s, dataStr = pcall(readfile, STOREDATA_FILE)
+    local targetFile = isfile(DUMP_F1) and DUMP_F1 or (isfile(DUMP_F2) and DUMP_F2 or nil)
+    
+    if targetFile then
+        local s, dataStr = pcall(readfile, targetFile)
         if s then
             local rawData = DecodeData(dataStr)
             if rawData then
@@ -637,7 +672,12 @@ local function AddPurchasedScript(internalName, durationSeconds)
     purchased[internalName] = expireTimestamp
     local list = {}
     for name, exp in pairs(purchased) do table.insert(list, name .. ":" .. tostring(exp)) end
-    if writefile then pcall(writefile, STOREDATA_FILE, EncodeData(table.concat(list, "|"))) end
+    local encoded = EncodeData(table.concat(list, "|"))
+    
+    if writefile then
+        pcall(writefile, DUMP_F1, encoded)
+        pcall(writefile, DUMP_F2, encoded)
+    end
 end
 
 local function ParseTimeToSeconds(timeStr)
@@ -653,7 +693,7 @@ local function ParseTimeToSeconds(timeStr)
 end
 
 -- ==========================================
--- Fetch Data
+-- Fetch Data from Web
 -- ==========================================
 local STORE_URL = "https://raw.githubusercontent.com/bilibil31-lime/ilikepomelo555tyGGbyeJJK10101/main/Core/pomelo_strore.lua"
 local function FetchStoreItems()
@@ -681,87 +721,184 @@ local function FetchStoreItems()
 end
 
 -- ==========================================
--- UI: Main Structure
+-- UI: Base Structure (Formal & Clean)
 -- ==========================================
 local MainBackground = Instance.new("Frame", TabContainer)
 MainBackground.Size = UDim2.new(1, 0, 1, 0)
-MainBackground.BackgroundColor3 = Color3.fromRGB(60, 60, 60) -- พื้นหลังสีเทาเข้ม
-MainBackground.BorderSizePixel = 0
+MainBackground.BackgroundTransparency = 1 -- ลบพื้นหลังเทาออกเพื่อไม่ให้ซ้อนทับขอบ
 
--- Header: P.store
-local StoreTitle = Instance.new("TextLabel", MainBackground)
-StoreTitle.Size = UDim2.new(0, 150, 0, 40)
-StoreTitle.Position = UDim2.new(0, 20, 0, 15)
+-- Header Area
+local HeaderFrame = Instance.new("Frame", MainBackground)
+HeaderFrame.Size = UDim2.new(1, 0, 0, 50)
+HeaderFrame.BackgroundTransparency = 1
+
+local StoreTitle = Instance.new("TextLabel", HeaderFrame)
+StoreTitle.Size = UDim2.new(0, 150, 1, 0)
+StoreTitle.Position = UDim2.new(0, 15, 0, 0)
 StoreTitle.BackgroundTransparency = 1
-StoreTitle.Text = "P.store"
-StoreTitle.TextColor3 = Color3.fromRGB(255, 102, 204) -- สีชมพู
-StoreTitle.Font = Enum.Font.GothamBold
-StoreTitle.TextSize = 38
+StoreTitle.Text = "P.STORE"
+StoreTitle.TextColor3 = Color3.fromRGB(255, 100, 180) 
+StoreTitle.Font = Enum.Font.Arcade -- ใช้ฟอนต์เดียวกับหน้าต่างหลัก
+StoreTitle.TextSize = 34
 StoreTitle.TextXAlignment = Enum.TextXAlignment.Left
 
--- Header: Credit Display (Added for convenience)
-local CreditDisplay = Instance.new("TextLabel", MainBackground)
-CreditDisplay.Size = UDim2.new(0, 100, 0, 20)
-CreditDisplay.Position = UDim2.new(0, 20, 0, 55)
-CreditDisplay.BackgroundTransparency = 1
-CreditDisplay.TextColor3 = Color3.fromRGB(220, 220, 220)
-CreditDisplay.Font = Enum.Font.GothamMedium
-CreditDisplay.TextSize = 14
-CreditDisplay.TextXAlignment = Enum.TextXAlignment.Left
+local TitleStroke = Instance.new("UIStroke", StoreTitle)
+TitleStroke.Color = Color3.fromRGB(255, 200, 240)
+TitleStroke.Thickness = 1
+TitleStroke.Transparency = 0.5
 
--- Header: Search Bar (Pink BG, Purple Stroke)
-local SearchFrame = Instance.new("Frame", MainBackground)
-SearchFrame.Size = UDim2.new(0.4, 0, 0, 40)
-SearchFrame.Position = UDim2.new(1, -20, 0, 15)
-SearchFrame.AnchorPoint = Vector2.new(1, 0)
-SearchFrame.BackgroundColor3 = Color3.fromRGB(255, 102, 204) -- สีชมพู
-local SearchCorner = Instance.new("UICorner", SearchFrame)
-SearchCorner.CornerRadius = UDim.new(0, 6)
+-- Search Bar (Longer & Formal)
+local SearchFrame = Instance.new("Frame", HeaderFrame)
+SearchFrame.Size = UDim2.new(0.45, 0, 0, 30)
+SearchFrame.Position = UDim2.new(0.5, -40, 0.5, 0)
+SearchFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+SearchFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+Instance.new("UICorner", SearchFrame).CornerRadius = UDim.new(0, 6)
+
 local SearchStroke = Instance.new("UIStroke", SearchFrame)
-SearchStroke.Color = Color3.fromRGB(153, 51, 255) -- กรอบสีม่วง
-SearchStroke.Thickness = 3
+SearchStroke.Color = Color3.fromRGB(255, 100, 180)
+SearchStroke.Thickness = 1
+SearchStroke.Transparency = 0.5
 
 local SearchBox = Instance.new("TextBox", SearchFrame)
-SearchBox.Size = UDim2.new(1, -40, 1, 0)
+SearchBox.Size = UDim2.new(1, -30, 1, 0)
 SearchBox.Position = UDim2.new(0, 10, 0, 0)
 SearchBox.BackgroundTransparency = 1
-SearchBox.PlaceholderText = "Search..."
-SearchBox.PlaceholderColor3 = Color3.fromRGB(255, 200, 230)
+SearchBox.PlaceholderText = "Search scripts..."
+SearchBox.PlaceholderColor3 = Color3.fromRGB(150, 150, 150)
 SearchBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-SearchBox.Font = Enum.Font.GothamBold
-SearchBox.TextSize = 16
+SearchBox.Font = Enum.Font.Jura
+SearchBox.TextSize = 14
 SearchBox.TextXAlignment = Enum.TextXAlignment.Left
 SearchBox.Text = ""
 
-local SearchIcon = Instance.new("TextLabel", SearchFrame)
-SearchIcon.Size = UDim2.new(0, 30, 0, 30)
-SearchIcon.Position = UDim2.new(1, -5, 0.5, 0)
-SearchIcon.AnchorPoint = Vector2.new(1, 0.5)
-SearchIcon.BackgroundTransparency = 1
-SearchIcon.Text = "🔍"
-SearchIcon.TextSize = 20
+-- Credits (Right aligned)
+local CreditDisplay = Instance.new("TextLabel", HeaderFrame)
+CreditDisplay.Size = UDim2.new(0, 120, 1, 0)
+CreditDisplay.Position = UDim2.new(1, -15, 0, 0)
+CreditDisplay.AnchorPoint = Vector2.new(1, 0)
+CreditDisplay.BackgroundTransparency = 1
+CreditDisplay.TextColor3 = Color3.fromRGB(200, 200, 200)
+CreditDisplay.Font = Enum.Font.Jura
+CreditDisplay.TextSize = 13
+CreditDisplay.TextXAlignment = Enum.TextXAlignment.Right
 
--- Scroll Area & Grid Layout
+-- Grid Scroll Area
 local ScrollContainer = Instance.new("ScrollingFrame", MainBackground)
-ScrollContainer.Size = UDim2.new(1, -40, 1, -90)
-ScrollContainer.Position = UDim2.new(0, 20, 0, 80)
+ScrollContainer.Size = UDim2.new(1, -30, 1, -60)
+ScrollContainer.Position = UDim2.new(0, 15, 0, 55)
 ScrollContainer.BackgroundTransparency = 1
 ScrollContainer.BorderSizePixel = 0
-ScrollContainer.ScrollBarThickness = 4
-ScrollContainer.ScrollBarImageColor3 = Color3.fromRGB(255, 102, 204)
+ScrollContainer.ScrollBarThickness = 2
+ScrollContainer.ScrollBarImageColor3 = Color3.fromRGB(255, 100, 180)
 
 local GridLayout = Instance.new("UIGridLayout", ScrollContainer)
-GridLayout.CellSize = UDim2.new(0, 140, 0, 170) -- ขนาดการ์ด
-GridLayout.CellPadding = UDim2.new(0, 15, 0, 15)
+GridLayout.CellSize = UDim2.new(0, 135, 0, 160) 
+GridLayout.CellPadding = UDim2.new(0, 12, 0, 12)
 GridLayout.SortOrder = Enum.SortOrder.LayoutOrder
-GridLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+
+-- ==========================================
+-- UI: Confirmation Modal
+-- ==========================================
+local ModalBackdrop = Instance.new("Frame", MainBackground)
+ModalBackdrop.Size = UDim2.new(1, 0, 1, 0)
+ModalBackdrop.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
+ModalBackdrop.BackgroundTransparency = 0.3
+ModalBackdrop.ZIndex = 50
+ModalBackdrop.Visible = false
+
+local ModalCard = Instance.new("Frame", ModalBackdrop)
+ModalCard.Size = UDim2.new(0, 280, 0, 150)
+ModalCard.Position = UDim2.new(0.5, 0, 0.5, 0)
+ModalCard.AnchorPoint = Vector2.new(0.5, 0.5)
+ModalCard.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+ModalCard.ZIndex = 51
+Instance.new("UICorner", ModalCard).CornerRadius = UDim.new(0, 8)
+local ModalStroke = Instance.new("UIStroke", ModalCard)
+ModalStroke.Color = Color3.fromRGB(255, 100, 180)
+ModalStroke.Thickness = 1
+
+local ModalTitle = Instance.new("TextLabel", ModalCard)
+ModalTitle.Size = UDim2.new(1, 0, 0, 30)
+ModalTitle.Position = UDim2.new(0, 0, 0, 15)
+ModalTitle.BackgroundTransparency = 1
+ModalTitle.Text = "CONFIRM PURCHASE"
+ModalTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+ModalTitle.Font = Enum.Font.Jura
+ModalTitle.TextSize = 16
+ModalTitle.ZIndex = 52
+
+local ModalDesc = Instance.new("TextLabel", ModalCard)
+ModalDesc.Size = UDim2.new(1, -20, 0, 40)
+ModalDesc.Position = UDim2.new(0, 10, 0, 45)
+ModalDesc.BackgroundTransparency = 1
+ModalDesc.Text = ""
+ModalDesc.TextColor3 = Color3.fromRGB(180, 180, 180)
+ModalDesc.Font = Enum.Font.Gotham
+ModalDesc.TextSize = 12
+ModalDesc.TextWrapped = true
+ModalDesc.ZIndex = 52
+
+local BtnConfirm = Instance.new("TextButton", ModalCard)
+BtnConfirm.Size = UDim2.new(0, 100, 0, 30)
+BtnConfirm.Position = UDim2.new(0.5, -110, 1, -45)
+BtnConfirm.BackgroundColor3 = Color3.fromRGB(100, 200, 100)
+BtnConfirm.Text = "CONFIRM"
+BtnConfirm.TextColor3 = Color3.fromRGB(0, 0, 0)
+BtnConfirm.Font = Enum.Font.GothamBold
+BtnConfirm.TextSize = 12
+BtnConfirm.ZIndex = 52
+Instance.new("UICorner", BtnConfirm).CornerRadius = UDim.new(0, 6)
+
+local BtnCancel = Instance.new("TextButton", ModalCard)
+BtnCancel.Size = UDim2.new(0, 100, 0, 30)
+BtnCancel.Position = UDim2.new(0.5, 10, 1, -45)
+BtnCancel.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
+BtnCancel.Text = "CANCEL"
+BtnCancel.TextColor3 = Color3.fromRGB(255, 255, 255)
+BtnCancel.Font = Enum.Font.GothamBold
+BtnCancel.TextSize = 12
+BtnCancel.ZIndex = 52
+Instance.new("UICorner", BtnCancel).CornerRadius = UDim.new(0, 6)
 
 -- ==========================================
 -- RENDER: Create Grid Cards
 -- ==========================================
-local CardList = {} -- เก็บไว้ทำระบบ Search
+local CardList = {} 
+local RenderStoreList -- ประกาศล่วงหน้า
 
-local function RenderStoreList()
+local function ShowConfirmModal(item, durationSeconds)
+    ModalBackdrop.Visible = true
+    ModalDesc.Text = string.format("Are you sure you want to buy\n%s\nfor %d Credits?", item.internalName, item.price)
+    
+    local connConfirm, connCancel
+    
+    local function Cleanup()
+        ModalBackdrop.Visible = false
+        if connConfirm then connConfirm:Disconnect() end
+        if connCancel then connCancel:Disconnect() end
+    end
+    
+    connCancel = BtnCancel.MouseButton1Click:Connect(Cleanup)
+    
+    connConfirm = BtnConfirm.MouseButton1Click:Connect(function()
+        local userNow = GetSysData()
+        if userNow.credits >= item.price then
+            userNow.credits = userNow.credits - item.price
+            SaveSysData(userNow)
+            AddPurchasedScript(item.internalName, durationSeconds)
+            Cleanup()
+            RenderStoreList()
+        else
+            ModalDesc.Text = "INSUFFICIENT CREDITS!"
+            ModalDesc.TextColor3 = Color3.fromRGB(255, 100, 100)
+            task.wait(1.5)
+            Cleanup()
+        end
+    end)
+end
+
+RenderStoreList = function()
     for _, child in ipairs(ScrollContainer:GetChildren()) do
         if child:IsA("Frame") then child:Destroy() end
     end
@@ -770,95 +907,86 @@ local function RenderStoreList()
     local storeItems = FetchStoreItems()
     local purchasedMap = GetPurchasedScripts()
     local currentUserData = GetSysData()
-    CreditDisplay.Text = "Credits: " .. currentUserData.credits .. " 💎"
+    CreditDisplay.Text = "CREDITS: " .. currentUserData.credits
 
     for _, item in ipairs(storeItems) do
         local durationSeconds = ParseTimeToSeconds(item.timeRaw)
         local expireTimestamp = purchasedMap[item.internalName]
         local isOwned = (expireTimestamp and (expireTimestamp == -1 or expireTimestamp > os.time()))
         
-        -- คอนเทนเนอร์ล่องหน (สำหรับรักษาระยะ Grid ไม่ให้พังตอน Hover)
         local GridCell = Instance.new("Frame", ScrollContainer)
         GridCell.BackgroundTransparency = 1
         
-        -- การ์ดของจริง (Visual Card) ที่จะขยายใหญ่ขึ้นได้
         local Card = Instance.new("Frame", GridCell)
         Card.Size = UDim2.new(1, 0, 1, 0)
         Card.Position = UDim2.new(0.5, 0, 0.5, 0)
         Card.AnchorPoint = Vector2.new(0.5, 0.5)
-        Card.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+        Card.BackgroundColor3 = Color3.fromRGB(28, 28, 33)
         Card.ClipsDescendants = true
         Instance.new("UICorner", Card).CornerRadius = UDim.new(0, 8)
+        local CardStroke = Instance.new("UIStroke", Card)
+        CardStroke.Color = Color3.fromRGB(50, 50, 60)
         
-        -- เก็บไว้สำหรับ Search
         table.insert(CardList, {cell = GridCell, name = item.internalName:lower()})
         
-        -- ครึ่งบน: ภาพปก (Pink Placeholder แบบในภาพอ้างอิง)
         local ImageTop = Instance.new("ImageLabel", Card)
-        ImageTop.Size = UDim2.new(1, 0, 0.55, 0)
-        ImageTop.BackgroundColor3 = Color3.fromRGB(255, 102, 204)
+        ImageTop.Size = UDim2.new(1, 0, 0.5, 0)
+        ImageTop.BackgroundColor3 = Color3.fromRGB(255, 100, 180)
         ImageTop.BorderSizePixel = 0
         ImageTop.ScaleType = Enum.ScaleType.Crop
         
-        -- ดึงรูปจาก Roblox (ถ้าพังจะเป็นสีชมพู)
         task.spawn(function()
             if item.uidmap then
                 local s, info = pcall(function() return MarketplaceService:GetProductInfo(item.uidmap) end)
                 if s and info then
                     ImageTop.Image = "rbxassetid://" .. info.IconImageAssetId
-                    -- เก็บชื่อจริงไว้ใช้กับ Search ได้ด้วย
                     CardList[#CardList].name = info.Name:lower()
                 end
             end
         end)
 
-        -- ครึ่งล่าง: ข้อมูล
         local BottomHalf = Instance.new("Frame", Card)
-        BottomHalf.Size = UDim2.new(1, 0, 0.45, 0)
-        BottomHalf.Position = UDim2.new(0, 0, 0.55, 0)
-        BottomHalf.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        BottomHalf.Size = UDim2.new(1, 0, 0.5, 0)
+        BottomHalf.Position = UDim2.new(0, 0, 0.5, 0)
+        BottomHalf.BackgroundColor3 = Color3.fromRGB(20, 20, 24)
         BottomHalf.BorderSizePixel = 0
         
-        -- ไล่สีเทาเข้ม->ดำ แบบในภาพ
-        local BtmGradient = Instance.new("UIGradient", BottomHalf)
-        BtmGradient.Color = ColorSequence.new(Color3.fromRGB(60, 60, 60), Color3.fromRGB(20, 20, 20))
-        BtmGradient.Rotation = 90
-        
         local NameLbl = Instance.new("TextLabel", BottomHalf)
-        NameLbl.Size = UDim2.new(1, -10, 0, 20)
+        NameLbl.Size = UDim2.new(1, -10, 0, 18)
         NameLbl.Position = UDim2.new(0, 5, 0, 5)
         NameLbl.BackgroundTransparency = 1
         NameLbl.Text = item.internalName
         NameLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
-        NameLbl.Font = Enum.Font.GothamBold
+        NameLbl.Font = Enum.Font.Jura
         NameLbl.TextSize = 13
         NameLbl.TextTruncate = Enum.TextTruncate.AtEnd
         
         local DescLbl = Instance.new("TextLabel", BottomHalf)
-        DescLbl.Size = UDim2.new(1, -10, 0, 15)
-        DescLbl.Position = UDim2.new(0, 5, 0, 25)
+        DescLbl.Size = UDim2.new(1, -10, 0, 20)
+        DescLbl.Position = UDim2.new(0, 5, 0, 23)
         DescLbl.BackgroundTransparency = 1
         DescLbl.Text = item.description
-        DescLbl.TextColor3 = Color3.fromRGB(180, 180, 180)
+        DescLbl.TextColor3 = Color3.fromRGB(150, 150, 150)
         DescLbl.Font = Enum.Font.Gotham
         DescLbl.TextSize = 10
+        DescLbl.TextWrapped = true
         DescLbl.TextTruncate = Enum.TextTruncate.AtEnd
         
         local PriceLbl = Instance.new("TextLabel", BottomHalf)
         PriceLbl.Size = UDim2.new(1, -10, 0, 20)
-        PriceLbl.Position = UDim2.new(0, 5, 1, -25)
+        PriceLbl.Position = UDim2.new(0, 5, 1, -22)
         PriceLbl.BackgroundTransparency = 1
-        PriceLbl.Text = item.price .. " 💎"
-        PriceLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+        PriceLbl.Text = "Price: " .. item.price
+        PriceLbl.TextColor3 = Color3.fromRGB(255, 200, 240)
         PriceLbl.Font = Enum.Font.GothamBold
-        PriceLbl.TextSize = 12
+        PriceLbl.TextSize = 11
         PriceLbl.TextXAlignment = Enum.TextXAlignment.Left
 
-        -- Hover Overlay (ซ่อนไว้ โชว์ตอนชี้/แตะ)
+        -- Hover Overlay
         local BuyOverlay = Instance.new("TextButton", Card)
         BuyOverlay.Size = UDim2.new(1, 0, 1, 0)
         BuyOverlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-        BuyOverlay.BackgroundTransparency = 1 -- 1 = ซ่อน
+        BuyOverlay.BackgroundTransparency = 1 
         BuyOverlay.Text = ""
         BuyOverlay.AutoButtonColor = false
         
@@ -866,91 +994,111 @@ local function RenderStoreList()
         OverlayText.Size = UDim2.new(1, 0, 1, 0)
         OverlayText.BackgroundTransparency = 1
         OverlayText.TextColor3 = Color3.fromRGB(255, 255, 255)
-        OverlayText.Font = Enum.Font.GothamBold
-        OverlayText.TextSize = 18
+        OverlayText.Font = Enum.Font.Jura
+        OverlayText.TextSize = 14
         OverlayText.TextTransparency = 1
         
         if isOwned then
-            OverlayText.Text = "OWNED ✅"
+            OverlayText.Text = "OWNED"
             OverlayText.TextColor3 = Color3.fromRGB(100, 255, 150)
         else
-            OverlayText.Text = "BUY 🛒"
+            OverlayText.Text = "HOLD TO BUY"
         end
 
-        -- ==========================================
-        -- Animation & Interaction
-        -- ==========================================
+        local ProgressFrame = Instance.new("Frame", BuyOverlay)
+        ProgressFrame.Size = UDim2.new(0, 0, 0, 4)
+        ProgressFrame.Position = UDim2.new(0, 0, 1, -4)
+        ProgressFrame.BackgroundColor3 = Color3.fromRGB(255, 100, 180)
+        ProgressFrame.BorderSizePixel = 0
+        ProgressFrame.BackgroundTransparency = 1
+
+        -- Animations & Hold Logic
         local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+        local isHovering = false
+        local isHolding = false
+        local holdConnection = nil
         
-        -- ขยายขึ้นตอนชี้ / เลื่อนเมาส์
         BuyOverlay.MouseEnter:Connect(function()
-            TweenService:Create(Card, tweenInfo, {Size = UDim2.new(1.08, 0, 1.08, 0)}):Play()
-            TweenService:Create(BuyOverlay, tweenInfo, {BackgroundTransparency = 0.5}):Play()
+            if ModalBackdrop.Visible then return end
+            isHovering = true
+            TweenService:Create(Card, tweenInfo, {Size = UDim2.new(1.05, 0, 1.05, 0)}):Play()
+            TweenService:Create(BuyOverlay, tweenInfo, {BackgroundTransparency = 0.6}):Play()
             TweenService:Create(OverlayText, tweenInfo, {TextTransparency = 0}):Play()
         end)
         
-        -- กลับขนาดเดิมตอนเอาเมาส์ออก
         BuyOverlay.MouseLeave:Connect(function()
+            isHovering = false
+            isHolding = false
             TweenService:Create(Card, tweenInfo, {Size = UDim2.new(1, 0, 1, 0)}):Play()
             TweenService:Create(BuyOverlay, tweenInfo, {BackgroundTransparency = 1}):Play()
             TweenService:Create(OverlayText, tweenInfo, {TextTransparency = 1}):Play()
+            TweenService:Create(ProgressFrame, TweenInfo.new(0.1), {Size = UDim2.new(0, 0, 0, 4), BackgroundTransparency = 1}):Play()
+            if not isOwned then OverlayText.Text = "HOLD TO BUY" end
         end)
         
-        -- ระบบกดซื้อ
-        BuyOverlay.MouseButton1Click:Connect(function()
-            if isOwned then return end -- มีอยู่แล้ว ข้ามไป
-            
-            local userNow = GetSysData()
-            if userNow.credits >= item.price then
-                userNow.credits = userNow.credits - item.price
-                SaveSysData(userNow)
-                AddPurchasedScript(item.internalName, durationSeconds)
+        -- Logic กดค้าง 3 วิ
+        BuyOverlay.InputBegan:Connect(function(input)
+            if isOwned or ModalBackdrop.Visible then return end
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                isHolding = true
+                local startTime = os.clock()
                 
-                OverlayText.Text = "SUCCESS!"
-                OverlayText.TextColor3 = Color3.fromRGB(100, 255, 150)
-                task.wait(0.5)
-                RenderStoreList() -- รีโหลดหน้าต่างหลังซื้อ
-            else
-                OverlayText.Text = "No Credit!"
-                OverlayText.TextColor3 = Color3.fromRGB(255, 100, 100)
-                task.wait(1)
-                OverlayText.Text = "BUY 🛒"
-                OverlayText.TextColor3 = Color3.fromRGB(255, 255, 255)
+                ProgressFrame.BackgroundTransparency = 0
+                TweenService:Create(ProgressFrame, TweenInfo.new(3, Enum.EasingStyle.Linear), {Size = UDim2.new(1, 0, 0, 4)}):Play()
+                
+                if holdConnection then holdConnection:Disconnect() end
+                holdConnection = RunService.Heartbeat:Connect(function()
+                    if not isHolding then 
+                        holdConnection:Disconnect() 
+                        return 
+                    end
+                    
+                    local elapsed = os.clock() - startTime
+                    local remain = math.ceil(3 - elapsed)
+                    OverlayText.Text = "HOLD... " .. remain
+                    
+                    if elapsed >= 3 then
+                        isHolding = false
+                        holdConnection:Disconnect()
+                        OverlayText.Text = "PROCESSING"
+                        TweenService:Create(ProgressFrame, TweenInfo.new(0.1), {Size = UDim2.new(0, 0, 0, 4), BackgroundTransparency = 1}):Play()
+                        ShowConfirmModal(item, durationSeconds)
+                    end
+                end)
+            end
+        end)
+
+        BuyOverlay.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                isHolding = false
+                TweenService:Create(ProgressFrame, TweenInfo.new(0.2), {Size = UDim2.new(0, 0, 0, 4), BackgroundTransparency = 1}):Play()
+                if not isOwned and isHovering then OverlayText.Text = "HOLD TO BUY" end
             end
         end)
         
-        -- อัปเดตชื่อให้สวยๆ ถ้าหาใน Roblox เจอ
         task.spawn(function()
             if item.uidmap then
                 local s, info = pcall(function() return MarketplaceService:GetProductInfo(item.uidmap) end)
-                if s and info then
-                    NameLbl.Text = info.Name
-                end
+                if s and info then NameLbl.Text = info.Name end
             end
         end)
     end
     
-    -- คำนวณความสูงของ Scroll (ให้เลื่อนลงได้)
-    ScrollContainer.CanvasSize = UDim2.new(0, 0, 0, GridLayout.AbsoluteContentSize.Y + 30)
+    ScrollContainer.CanvasSize = UDim2.new(0, 0, 0, GridLayout.AbsoluteContentSize.Y + 20)
 end
 
 -- ==========================================
--- SYSTEM: Search Logic (ช่องค้นหา)
+-- SYSTEM: Search Logic
 -- ==========================================
 SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
     local query = SearchBox.Text:lower()
     for _, itemData in ipairs(CardList) do
-        if query == "" or itemData.name:find(query) then
-            itemData.cell.Visible = true
-        else
-            itemData.cell.Visible = false
-        end
+        itemData.cell.Visible = (query == "" or itemData.name:find(query) ~= nil)
     end
-    -- อัปเดตขนาด Canvas ใหม่
     task.wait(0.1)
-    ScrollContainer.CanvasSize = UDim2.new(0, 0, 0, GridLayout.AbsoluteContentSize.Y + 30)
+    ScrollContainer.CanvasSize = UDim2.new(0, 0, 0, GridLayout.AbsoluteContentSize.Y + 20)
 end)
 
--- Initial Load
+-- Start Render
 task.spawn(RenderStoreList)
 ]...

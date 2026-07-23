@@ -9,6 +9,14 @@ local LINK_PC = "https://raw.githubusercontent.com/bilibil31-lime/ilikepomelo555
 local LINK_PE = "https://raw.githubusercontent.com/bilibil31-lime/ilikepomelo555tyGGbyeJJK10101/main/Modules/mod_pe.lua"  
 local LINK_TABS_DATA = "https://raw.githubusercontent.com/bilibil31-lime/ilikepomelo555tyGGbyeJJK10101/main/Core/pomelo_main.lua"
 
+-- ==========================================
+-- SYSTEM FIX: ป้องกัน Memory Leak & UI พังเวลารันซ้ำ
+-- ==========================================
+if _G.PomeloFPSConnection then
+    _G.PomeloFPSConnection:Disconnect()
+    _G.PomeloFPSConnection = nil
+end
+
 local UI_PARENT = (gethui and gethui()) or CoreGui
 if UI_PARENT:FindFirstChild("PomeloMainUI") then UI_PARENT.PomeloMainUI:Destroy() end
 
@@ -90,9 +98,7 @@ end)
 UserInputService.InputChanged:Connect(function(input)
     if floatDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
         local delta = input.Position - floatDragStart
-        if delta.Magnitude > 3 then 
-            floatHasMoved = true
-        end
+        if delta.Magnitude > 3 then floatHasMoved = true end
         local viewport = Camera.ViewportSize
         local floatSize = FloatingBtn.AbsoluteSize
         local newX = math.clamp(floatStartPos.X.Offset + delta.X, 0, viewport.X - floatSize.X)
@@ -151,9 +157,6 @@ MainFrame.InputChanged:Connect(function(input)
     end
 end)
 
--- ==========================================
--- Window Dragging with Screen Edge Clamping
--- ==========================================
 local dragging, dragStart, startPos
 local DragArea = Instance.new("Frame")
 DragArea.Parent = MainFrame
@@ -174,16 +177,12 @@ UserInputService.InputChanged:Connect(function(input)
         local delta = input.Position - dragStart
         local viewport = Camera.ViewportSize
         local frameSize = MainFrame.AbsoluteSize
-        
-        -- จำกัดให้อยู่ภายในขอบจอเสมอ ไม่ให้หลุดออกไป
         local minX = frameSize.X / 2
         local maxX = viewport.X - (frameSize.X / 2)
         local minY = frameSize.Y / 2
         local maxY = viewport.Y - (frameSize.Y / 2)
-        
         local newX = math.clamp(startPos.X.Offset + delta.X, minX, maxX)
         local newY = math.clamp(startPos.Y.Offset + delta.Y, minY, maxY)
-        
         MainFrame.Position = UDim2.new(0, newX, 0, newY)
     end
 end)
@@ -233,7 +232,7 @@ CreateActionBtn("PC", 155, function() loadstring(game:HttpGet(LINK_PC))() end)
 CreateActionBtn("PE", 205, function() loadstring(game:HttpGet(LINK_PE))() end)
 
 -- ==========================================
--- Stats Display (Fixed FPS Calculation)
+-- Stats Display (Fixed Memory Leak!)
 -- ==========================================
 local StatsLabel = Instance.new("TextLabel")
 StatsLabel.Parent = MainFrame
@@ -250,7 +249,7 @@ local currentFPS = 60
 local frameCount = 0
 local lastTick = os.clock()
 
-RunService.RenderStepped:Connect(function()
+_G.PomeloFPSConnection = RunService.RenderStepped:Connect(function()
     frameCount = frameCount + 1
     local now = os.clock()
     if now - lastTick >= 1 then
@@ -263,12 +262,8 @@ end)
 task.spawn(function()
     while ScreenGui.Parent do
         local ping = 0
-        pcall(function()
-            ping = math.round(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
-        end)
-        
+        pcall(function() ping = math.round(Stats.Network.ServerStatsItem["Data Ping"]:GetValue()) end)
         local ramUsed = math.round(Stats:GetTotalMemoryUsageMb())
-
         StatsLabel.Text = string.format("Ping: %dms | RAM: %dMB | FPS: %d", ping, ramUsed, currentFPS)
         task.wait(1)
     end
@@ -298,6 +293,7 @@ CreateWindowBtn("X", -20, Color3.fromRGB(255, 60, 60), function()
     local t = TweenService:Create(MainScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Scale = 0})
     t:Play()
     t.Completed:Wait()
+    if _G.PomeloFPSConnection then _G.PomeloFPSConnection:Disconnect() end -- ปิดกันบัคซ้ำซ้อน
     ScreenGui:Destroy()
 end)
 

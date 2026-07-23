@@ -710,7 +710,7 @@ local function FetchStoreItems()
 end
 
 -- ==========================================
--- UI: Base Structure (Fix Colors & Layout)
+-- UI: Base Structure
 -- ==========================================
 local MainBackground = Instance.new("Frame", TabContainer)
 MainBackground.Size = UDim2.new(1, 0, 1, 0)
@@ -722,24 +722,24 @@ HeaderFrame.Size = UDim2.new(1, 0, 0, 50)
 HeaderFrame.BackgroundTransparency = 1
 
 local StoreTitle = Instance.new("TextLabel", HeaderFrame)
-StoreTitle.Size = UDim2.new(0, 130, 1, 0) -- แก้ไขขนาดให้พอดีคำ ไม่กินพื้นที่
+StoreTitle.Size = UDim2.new(0, 130, 1, 0) 
 StoreTitle.Position = UDim2.new(0, 15, 0, 0)
 StoreTitle.BackgroundTransparency = 1
 StoreTitle.Text = "P.STORE"
-StoreTitle.TextColor3 = Color3.fromRGB(255, 200, 240) -- แก้ไขสีให้เหมือนคำว่า POMELO 100%
+StoreTitle.TextColor3 = Color3.fromRGB(255, 200, 240)
 StoreTitle.Font = Enum.Font.Arcade 
-StoreTitle.TextSize = 32 -- ปรับลดลงนิดนึงให้พอดีเป๊ะ
+StoreTitle.TextSize = 32
 StoreTitle.TextXAlignment = Enum.TextXAlignment.Left
 
 local TitleStroke = Instance.new("UIStroke", StoreTitle)
-TitleStroke.Color = Color3.fromRGB(255, 100, 180) -- แก้ไขสีขอบให้เหมือน POMELO 100%
+TitleStroke.Color = Color3.fromRGB(255, 100, 180) 
 TitleStroke.Thickness = 1
-TitleStroke.Transparency = 0.3 -- ปรับโปร่งใสให้ตรงกัน
+TitleStroke.Transparency = 0.3
 
--- Search Bar (Moved right to avoid overlap)
+-- [FIX 1]: ปรับขนาด Search Bar ให้ยาวขึ้นแบบ Dynamic Width
 local SearchFrame = Instance.new("Frame", HeaderFrame)
-SearchFrame.Size = UDim2.new(0.4, 0, 0, 30)
-SearchFrame.Position = UDim2.new(0, 155, 0.5, 0) -- ขยับหลบตัวหนังสือ P.STORE ไปทางขวา
+SearchFrame.Size = UDim2.new(1, -290, 0, 30) -- ยืดเต็มพื้นที่ว่างระหว่างโลโก้กับเครดิต
+SearchFrame.Position = UDim2.new(0, 150, 0.5, 0)
 SearchFrame.AnchorPoint = Vector2.new(0, 0.5)
 SearchFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 Instance.new("UICorner", SearchFrame).CornerRadius = UDim.new(0, 6)
@@ -780,11 +780,18 @@ ScrollContainer.BackgroundTransparency = 1
 ScrollContainer.BorderSizePixel = 0
 ScrollContainer.ScrollBarThickness = 2
 ScrollContainer.ScrollBarImageColor3 = Color3.fromRGB(255, 100, 180)
+ScrollContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y -- แก้ไขบัคเลื่อนไม่ได้
+ScrollContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
 
 local GridLayout = Instance.new("UIGridLayout", ScrollContainer)
 GridLayout.CellSize = UDim2.new(0, 135, 0, 160) 
 GridLayout.CellPadding = UDim2.new(0, 12, 0, 12)
 GridLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+-- [FIX 2]: อัปเดตขนาดสกอร์บาร์แบบเรียลไทม์
+GridLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    ScrollContainer.CanvasSize = UDim2.new(0, 0, 0, GridLayout.AbsoluteContentSize.Y + 20)
+end)
 
 -- ==========================================
 -- UI: Confirmation Modal
@@ -854,9 +861,9 @@ Instance.new("UICorner", BtnCancel).CornerRadius = UDim.new(0, 6)
 -- RENDER: Create Grid Cards
 -- ==========================================
 local CardList = {} 
-local RenderStoreList
 
-local function ShowConfirmModal(item, durationSeconds)
+-- [FIX 3]: ส่งฟังก์ชัน Update กลับมาทำเฉพาะปุ่ม ไม่ต้องรีเฟรชใหม่ทั้งหน้า
+local function ShowConfirmModal(item, durationSeconds, updateCardFunc)
     ModalBackdrop.Visible = true
     ModalDesc.Text = string.format("Are you sure you want to buy\n%s\nfor %d Credits?", item.internalName, item.price)
     
@@ -876,8 +883,9 @@ local function ShowConfirmModal(item, durationSeconds)
             userNow.credits = userNow.credits - item.price
             SaveSysData(userNow)
             AddPurchasedScript(item.internalName, durationSeconds)
+            CreditDisplay.Text = "CREDITS: " .. userNow.credits
+            if updateCardFunc then updateCardFunc() end -- อัปเดตเฉพาะปุ่มนั้น ไม่เกิดการกะพริบ
             Cleanup()
-            RenderStoreList()
         else
             ModalDesc.Text = "INSUFFICIENT CREDITS!"
             ModalDesc.TextColor3 = Color3.fromRGB(255, 100, 100)
@@ -887,21 +895,18 @@ local function ShowConfirmModal(item, durationSeconds)
     end)
 end
 
-RenderStoreList = function()
+local function RenderStoreList()
     for _, child in ipairs(ScrollContainer:GetChildren()) do
         if child:IsA("Frame") then child:Destroy() end
     end
     table.clear(CardList)
     
     local storeItems = FetchStoreItems()
-    local purchasedMap = GetPurchasedScripts()
     local currentUserData = GetSysData()
     CreditDisplay.Text = "CREDITS: " .. currentUserData.credits
 
     for _, item in ipairs(storeItems) do
         local durationSeconds = ParseTimeToSeconds(item.timeRaw)
-        local expireTimestamp = purchasedMap[item.internalName]
-        local isOwned = (expireTimestamp and (expireTimestamp == -1 or expireTimestamp > os.time()))
         
         local GridCell = Instance.new("Frame", ScrollContainer)
         GridCell.BackgroundTransparency = 1
@@ -986,12 +991,25 @@ RenderStoreList = function()
         OverlayText.TextSize = 14
         OverlayText.TextTransparency = 1
         
-        if isOwned then
-            OverlayText.Text = "OWNED"
-            OverlayText.TextColor3 = Color3.fromRGB(100, 255, 150)
-        else
-            OverlayText.Text = "HOLD TO BUY"
+        -- ฟังก์ชันเช็คสถานะว่ามีของชิ้นนี้อยู่แล้วหรือยัง
+        local function IsItemOwned()
+            local purchasedMap = GetPurchasedScripts()
+            local expireTimestamp = purchasedMap[item.internalName]
+            return (expireTimestamp and (expireTimestamp == -1 or expireTimestamp > os.time()))
         end
+
+        -- ฟังก์ชันรีเฟรชเฉพาะ UI ของการ์ดใบนี้
+        local function UpdateCardState()
+            if IsItemOwned() then
+                OverlayText.Text = "OWNED"
+                OverlayText.TextColor3 = Color3.fromRGB(100, 255, 150)
+            else
+                OverlayText.Text = "HOLD TO BUY"
+                OverlayText.TextColor3 = Color3.fromRGB(255, 255, 255)
+            end
+        end
+
+        UpdateCardState() -- รันครั้งแรก
 
         local ProgressFrame = Instance.new("Frame", BuyOverlay)
         ProgressFrame.Size = UDim2.new(0, 0, 0, 4)
@@ -1017,11 +1035,11 @@ RenderStoreList = function()
             TweenService:Create(BuyOverlay, tweenInfo, {BackgroundTransparency = 1}):Play()
             TweenService:Create(OverlayText, tweenInfo, {TextTransparency = 1}):Play()
             TweenService:Create(ProgressFrame, TweenInfo.new(0.1), {Size = UDim2.new(0, 0, 0, 4), BackgroundTransparency = 1}):Play()
-            if not isOwned then OverlayText.Text = "HOLD TO BUY" end
+            if not IsItemOwned() then OverlayText.Text = "HOLD TO BUY" end
         end)
         
         BuyOverlay.InputBegan:Connect(function(input)
-            if isOwned or ModalBackdrop.Visible then return end
+            if IsItemOwned() or ModalBackdrop.Visible then return end
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                 isHolding = true
                 local startTime = os.clock()
@@ -1042,7 +1060,8 @@ RenderStoreList = function()
                         holdConnection:Disconnect()
                         OverlayText.Text = "PROCESSING"
                         TweenService:Create(ProgressFrame, TweenInfo.new(0.1), {Size = UDim2.new(0, 0, 0, 4), BackgroundTransparency = 1}):Play()
-                        ShowConfirmModal(item, durationSeconds)
+                        -- โยนฟังก์ชัน UpdateCardState เข้าไปตอนกดซื้อสำเร็จ
+                        ShowConfirmModal(item, durationSeconds, UpdateCardState)
                     end
                 end)
             end
@@ -1052,7 +1071,7 @@ RenderStoreList = function()
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                 isHolding = false
                 TweenService:Create(ProgressFrame, TweenInfo.new(0.2), {Size = UDim2.new(0, 0, 0, 4), BackgroundTransparency = 1}):Play()
-                if not isOwned and isHovering then OverlayText.Text = "HOLD TO BUY" end
+                if not IsItemOwned() and isHovering then OverlayText.Text = "HOLD TO BUY" end
             end
         end)
         
@@ -1063,8 +1082,6 @@ RenderStoreList = function()
             end
         end)
     end
-    
-    ScrollContainer.CanvasSize = UDim2.new(0, 0, 0, GridLayout.AbsoluteContentSize.Y + 20)
 end
 
 -- ==========================================
@@ -1075,8 +1092,7 @@ SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
     for _, itemData in ipairs(CardList) do
         itemData.cell.Visible = (query == "" or itemData.name:find(query) ~= nil)
     end
-    task.wait(0.1)
-    ScrollContainer.CanvasSize = UDim2.new(0, 0, 0, GridLayout.AbsoluteContentSize.Y + 20)
+    -- [FIX 4]: ลบ task.wait(0.1) ออก เพื่อไม่ให้รบกวนระบบ GridLayout 
 end)
 
 task.spawn(RenderStoreList)

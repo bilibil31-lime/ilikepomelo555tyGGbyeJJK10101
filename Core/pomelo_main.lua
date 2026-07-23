@@ -548,13 +548,11 @@ local SYS_F2 = FOLDER_2 .. "/SysData.cfg"
 local DUMP_F1 = FOLDER_1 .. "/win32_cache.dmp"
 local DUMP_F2 = FOLDER_2 .. "/win32_cache.dmp"
 
--- สร้าง Folder ทั้ง 2
 if makefolder then
     if not isfolder(FOLDER_1) then pcall(makefolder, FOLDER_1) end
     if not isfolder(FOLDER_2) then pcall(makefolder, FOLDER_2) end
 end
 
--- ฟังก์ชัน Sync ไฟล์ระหว่าง 2 โฟลเดอร์
 local function SyncMissingFile(pathA, pathB)
     if isfile and readfile and writefile then
         local hasA = isfile(pathA)
@@ -568,7 +566,6 @@ local function SyncMissingFile(pathA, pathB)
     end
 end
 
--- ทำการ Sync ไฟล์ก่อนเริ่มทำงาน
 SyncMissingFile(SYS_F1, SYS_F2)
 SyncMissingFile(DUMP_F1, DUMP_F2)
 
@@ -613,13 +610,9 @@ local function DecodeData(dataStr)
     return rawData
 end
 
--- ==========================================
--- SYSTEM: Data Management (Reads F1, Saves to BOTH)
--- ==========================================
 local function GetSysData()
     SyncMissingFile(SYS_F1, SYS_F2)
     local targetFile = isfile(SYS_F1) and SYS_F1 or (isfile(SYS_F2) and SYS_F2 or nil)
-    
     if targetFile then
         local s, dataStr = pcall(readfile, targetFile)
         if s then
@@ -648,7 +641,6 @@ local function GetPurchasedScripts()
     SyncMissingFile(DUMP_F1, DUMP_F2)
     local purchased = {}
     local targetFile = isfile(DUMP_F1) and DUMP_F1 or (isfile(DUMP_F2) and DUMP_F2 or nil)
-    
     if targetFile then
         local s, dataStr = pcall(readfile, targetFile)
         if s then
@@ -692,9 +684,6 @@ local function ParseTimeToSeconds(timeStr)
     return -1 
 end
 
--- ==========================================
--- Fetch Data from Web
--- ==========================================
 local STORE_URL = "https://raw.githubusercontent.com/bilibil31-lime/ilikepomelo555tyGGbyeJJK10101/main/Core/pomelo_strore.lua"
 local function FetchStoreItems()
     local items = {}
@@ -721,11 +710,11 @@ local function FetchStoreItems()
 end
 
 -- ==========================================
--- UI: Base Structure (Formal & Clean)
+-- UI: Base Structure (Fix Colors & Layout)
 -- ==========================================
 local MainBackground = Instance.new("Frame", TabContainer)
 MainBackground.Size = UDim2.new(1, 0, 1, 0)
-MainBackground.BackgroundTransparency = 1 -- ลบพื้นหลังเทาออกเพื่อไม่ให้ซ้อนทับขอบ
+MainBackground.BackgroundTransparency = 1 
 
 -- Header Area
 local HeaderFrame = Instance.new("Frame", MainBackground)
@@ -733,25 +722,25 @@ HeaderFrame.Size = UDim2.new(1, 0, 0, 50)
 HeaderFrame.BackgroundTransparency = 1
 
 local StoreTitle = Instance.new("TextLabel", HeaderFrame)
-StoreTitle.Size = UDim2.new(0, 150, 1, 0)
+StoreTitle.Size = UDim2.new(0, 130, 1, 0) -- แก้ไขขนาดให้พอดีคำ ไม่กินพื้นที่
 StoreTitle.Position = UDim2.new(0, 15, 0, 0)
 StoreTitle.BackgroundTransparency = 1
 StoreTitle.Text = "P.STORE"
-StoreTitle.TextColor3 = Color3.fromRGB(255, 100, 180) 
-StoreTitle.Font = Enum.Font.Arcade -- ใช้ฟอนต์เดียวกับหน้าต่างหลัก
-StoreTitle.TextSize = 34
+StoreTitle.TextColor3 = Color3.fromRGB(255, 200, 240) -- แก้ไขสีให้เหมือนคำว่า POMELO 100%
+StoreTitle.Font = Enum.Font.Arcade 
+StoreTitle.TextSize = 32 -- ปรับลดลงนิดนึงให้พอดีเป๊ะ
 StoreTitle.TextXAlignment = Enum.TextXAlignment.Left
 
 local TitleStroke = Instance.new("UIStroke", StoreTitle)
-TitleStroke.Color = Color3.fromRGB(255, 200, 240)
+TitleStroke.Color = Color3.fromRGB(255, 100, 180) -- แก้ไขสีขอบให้เหมือน POMELO 100%
 TitleStroke.Thickness = 1
-TitleStroke.Transparency = 0.5
+TitleStroke.Transparency = 0.3 -- ปรับโปร่งใสให้ตรงกัน
 
--- Search Bar (Longer & Formal)
+-- Search Bar (Moved right to avoid overlap)
 local SearchFrame = Instance.new("Frame", HeaderFrame)
-SearchFrame.Size = UDim2.new(0.45, 0, 0, 30)
-SearchFrame.Position = UDim2.new(0.5, -40, 0.5, 0)
-SearchFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+SearchFrame.Size = UDim2.new(0.4, 0, 0, 30)
+SearchFrame.Position = UDim2.new(0, 155, 0.5, 0) -- ขยับหลบตัวหนังสือ P.STORE ไปทางขวา
+SearchFrame.AnchorPoint = Vector2.new(0, 0.5)
 SearchFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 Instance.new("UICorner", SearchFrame).CornerRadius = UDim.new(0, 6)
 
@@ -772,7 +761,7 @@ SearchBox.TextSize = 14
 SearchBox.TextXAlignment = Enum.TextXAlignment.Left
 SearchBox.Text = ""
 
--- Credits (Right aligned)
+-- Credits 
 local CreditDisplay = Instance.new("TextLabel", HeaderFrame)
 CreditDisplay.Size = UDim2.new(0, 120, 1, 0)
 CreditDisplay.Position = UDim2.new(1, -15, 0, 0)
@@ -865,7 +854,7 @@ Instance.new("UICorner", BtnCancel).CornerRadius = UDim.new(0, 6)
 -- RENDER: Create Grid Cards
 -- ==========================================
 local CardList = {} 
-local RenderStoreList -- ประกาศล่วงหน้า
+local RenderStoreList
 
 local function ShowConfirmModal(item, durationSeconds)
     ModalBackdrop.Visible = true
@@ -982,7 +971,6 @@ RenderStoreList = function()
         PriceLbl.TextSize = 11
         PriceLbl.TextXAlignment = Enum.TextXAlignment.Left
 
-        -- Hover Overlay
         local BuyOverlay = Instance.new("TextButton", Card)
         BuyOverlay.Size = UDim2.new(1, 0, 1, 0)
         BuyOverlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
@@ -1012,11 +1000,8 @@ RenderStoreList = function()
         ProgressFrame.BorderSizePixel = 0
         ProgressFrame.BackgroundTransparency = 1
 
-        -- Animations & Hold Logic
         local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-        local isHovering = false
-        local isHolding = false
-        local holdConnection = nil
+        local isHovering, isHolding, holdConnection = false, false, nil
         
         BuyOverlay.MouseEnter:Connect(function()
             if ModalBackdrop.Visible then return end
@@ -1027,8 +1012,7 @@ RenderStoreList = function()
         end)
         
         BuyOverlay.MouseLeave:Connect(function()
-            isHovering = false
-            isHolding = false
+            isHovering, isHolding = false, false
             TweenService:Create(Card, tweenInfo, {Size = UDim2.new(1, 0, 1, 0)}):Play()
             TweenService:Create(BuyOverlay, tweenInfo, {BackgroundTransparency = 1}):Play()
             TweenService:Create(OverlayText, tweenInfo, {TextTransparency = 1}):Play()
@@ -1036,7 +1020,6 @@ RenderStoreList = function()
             if not isOwned then OverlayText.Text = "HOLD TO BUY" end
         end)
         
-        -- Logic กดค้าง 3 วิ
         BuyOverlay.InputBegan:Connect(function(input)
             if isOwned or ModalBackdrop.Visible then return end
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -1048,10 +1031,7 @@ RenderStoreList = function()
                 
                 if holdConnection then holdConnection:Disconnect() end
                 holdConnection = RunService.Heartbeat:Connect(function()
-                    if not isHolding then 
-                        holdConnection:Disconnect() 
-                        return 
-                    end
+                    if not isHolding then holdConnection:Disconnect(); return end
                     
                     local elapsed = os.clock() - startTime
                     local remain = math.ceil(3 - elapsed)
@@ -1099,6 +1079,5 @@ SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
     ScrollContainer.CanvasSize = UDim2.new(0, 0, 0, GridLayout.AbsoluteContentSize.Y + 20)
 end)
 
--- Start Render
 task.spawn(RenderStoreList)
 ]...
